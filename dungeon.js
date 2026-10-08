@@ -149,11 +149,14 @@ function advanceFloor() {
   if (isBossFloor(f)) gameState.checkpoint = f + DUNGEON.checkpointOffset;
   gameState.floor = f + 1;
   gameState.maxFloor = Math.max(gameState.maxFloor, gameState.floor);
+  gameState.bestFloor = Math.max(gameState.bestFloor || 1, gameState.maxFloor); // 周回しても減らない記録
   saveGame();
+  Cloud.save('floor'); // 階層クリア時にクラウドへ保存（最高記録ならランキングも更新）
 }
 
 // 全滅したとき：チェックポイントへ戻る
 function returnToCheckpoint() {
   gameState.floor = gameState.checkpoint;
   saveGame();
+  Cloud.save('wipe');
 }
