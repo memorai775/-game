@@ -105,7 +105,8 @@ const Cloud = {
         await this.fb.signInAnonymously(this.auth);
       } catch (e) {
         console.error('匿名ログインに失敗', e);
-        this.setStatus('オフライン（ログインできません）');
+        // 原因が分かるようにエラーの種類も出す（例：auth/operation-not-allowed = 匿名ログインが無効）
+        this.setStatus(`オフライン（ログインできません：${e.code || e.message}）`);
       }
       return; // ログインできると、もう一度 onUser が呼ばれる
     }
@@ -121,7 +122,7 @@ const Cloud = {
       else await this.submitRanking();
     } catch (e) {
       console.error('クラウドの読み込みに失敗', e);
-      this.setStatus('⚠ クラウドに接続できません');
+      this.setStatus(`⚠ クラウドに接続できません：${e.code || e.message}`);
     }
   },
 
