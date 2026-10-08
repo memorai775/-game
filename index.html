@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ターン制バトル｜50階層ダンジョンRPG</title>
+  <meta name="description" content="ブラウザで遊べるターン制バトルRPG。仲間を集め、強化とアイテム合成で50階層のダンジョンに挑もう。オートバトル・放置成長にも対応。">
+  <meta name="theme-color" content="#151823">
+
+  <!-- ファビコン -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="characters/hero.png">
+
+  <!-- SNSで共有したときの表示（OGP） -->
+  <!-- ※ og:image と og:url は公開先のURLが決まったら「https://〜」から始まる絶対URLに書き換えてください -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ターン制バトル">
+  <meta property="og:title" content="ターン制バトル｜50階層ダンジョンRPG">
+  <meta property="og:description" content="仲間を集め、強化とアイテム合成で50階層のダンジョンに挑むブラウザRPG。オートバトル・放置成長にも対応。">
+  <meta property="og:image" content="characters/hero.png">
+  <!-- 公開URLが決まったら追加： <meta property="og:url" content="https://（公開先のURL）/"> -->
+  <meta property="og:locale" content="ja_JP">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ターン制バトル｜50階層ダンジョンRPG">
+  <meta name="twitter:description" content="仲間を集め、強化とアイテム合成で50階層のダンジョンに挑むブラウザRPG。">
+  <meta name="twitter:image" content="characters/hero.png">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <h1>ターン制バトル</h1>
+      <button id="help-btn" type="button">？ 遊び方</button>
+    </div>
+    <!-- 現在の階／最高到達階 -->
+    <div id="floor-status"></div>
+    <!-- 全体レベル・経験値・ポイント -->
+    <div id="global-status"></div>
+    <!-- 未選択のアイテム報酬があるときだけ出る（押すとアイテムタブを開く） -->
+    <button id="reward-badge" class="hidden"></button>
+  </header>
+
+  <main>
+    <div id="battle-screen">
+      <!-- オート・戦闘速度 -->
+      <div class="controls">
+        <button id="auto-btn">オート：OFF</button>
+        <span>速度：</span>
+        <span id="speed-buttons"></span>
+      </div>
+
+      <div class="battle-layout">
+        <!-- 左：バトル本体 -->
+        <div class="battle-main" id="battle-main">
+
+          <!-- 敵 -->
+          <section class="field">
+            <h2>敵</h2>
+            <div id="enemy-area" class="unit-row"></div>
+          </section>
+
+          <!-- 味方（出撃枠ぶん並ぶ） -->
+          <section class="field">
+            <h2>味方</h2>
+            <div id="ally-area" class="unit-row"></div>
+          </section>
+
+          <!-- コマンド -->
+          <section id="command-area">
+            <div id="command-title"></div>
+            <div id="command-buttons"></div>
+            <div id="skill-desc"></div>
+          </section>
+
+          <!-- 勝敗メッセージ -->
+          <div id="result" class="hidden"></div>
+
+          <!-- 戦闘ログ -->
+          <section id="log-area">
+            <h2>ログ</h2>
+            <div id="log"></div>
+          </section>
+        </div><!-- /.battle-main -->
+
+        <!-- 右：パネル（行動順／強化／アイテム）。どのタブでも戦闘は止まらない -->
+        <aside id="side-panel" data-tab="order">
+          <div id="panel-tabs">
+            <button data-tab="order">行動順</button>
+            <button data-tab="upgrade">強化</button>
+            <button data-tab="items">アイテム<span id="items-tab-badge" class="tab-badge hidden"></span></button>
+          </div>
+          <ol id="order-list"></ol>
+          <div id="upgrade-root" class="hidden"></div>
+          <div id="item-root" class="hidden"></div>
+        </aside>
+      </div><!-- /.battle-layout -->
+    </div>
+  </main>
+
+  <!-- エンディング（最終ボス撃破） -->
+  <div id="ending" class="hidden">
+    <div class="ending-box">
+      <div class="ending-title">― THE END ―</div>
+      <p class="ending-text">
+        天空王ゼニスは光の中に消えた。<br>
+        火山の炎は静まり、深海は穏やかさを取り戻し、<br>
+        空にはふたたび澄んだ青が広がっている。<br><br>
+        長い旅をともにした仲間たちに、心からの感謝を。
+      </p>
+      <div id="ending-stats" class="ending-stats"></div>
+      <div class="ending-buttons">
+        <button id="ending-next"></button>
+        <button id="ending-endless">このまま51階へ（無限モード）</button>
+      </div>
+      <p class="ending-note">どちらを選んでも、レベル・ポイント・強化・仲間・アイテムは引き継がれます。</p>
+    </div>
+  </div>
+
+  <!-- ポップアップ（放置経験値・仲間加入のお知らせなど） -->
+  <div id="popup" class="hidden">
+    <div class="popup-box">
+      <div id="popup-body"></div>
+      <button id="popup-ok">OK</button>
+    </div>
+  </div>
+
+  <!-- 説明の吹き出し（アイコンをタップしたとき） -->
+  <div id="toast"></div>
+
+  <!-- 読み込み順：データ → 成長要素・ダンジョン → パネル → バトル・起動 -->
+  <script src="data.js"></script>
+  <script src="items.js"></script>
+  <script src="progress.js"></script>
+  <script src="dungeon.js"></script>
+  <script src="panel.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

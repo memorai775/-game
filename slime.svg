@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="slimeBody" cx="40%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#a8f59a"/>
+      <stop offset="1" stop-color="#3aa648"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="128" cy="224" rx="90" ry="12" fill="#000" opacity=".15"/>
+  <path d="M38 212 C26 168 56 96 128 92 C200 96 230 168 218 212 C206 226 50 226 38 212Z"
+        fill="url(#slimeBody)" stroke="#1f5a2a" stroke-width="5" stroke-linejoin="round"/>
+  <ellipse cx="90" cy="128" rx="20" ry="10" fill="#fff" opacity=".65" transform="rotate(-30 90 128)"/>
+  <circle cx="112" cy="110" r="5" fill="#fff" opacity=".6"/>
+  <ellipse cx="102" cy="160" rx="10" ry="14" fill="#1b2a1e"/>
+  <ellipse cx="154" cy="160" rx="10" ry="14" fill="#1b2a1e"/>
+  <circle cx="105" cy="155" r="4" fill="#fff"/>
+  <circle cx="157" cy="155" r="4" fill="#fff"/>
+  <path d="M114 186 Q128 198 142 186" fill="none" stroke="#1b2a1e" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="84" cy="180" rx="9" ry="5" fill="#ff8fa3" opacity=".5"/>
+  <ellipse cx="172" cy="180" rx="9" ry="5" fill="#ff8fa3" opacity=".5"/>
+</svg>

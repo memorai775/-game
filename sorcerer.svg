@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="orb" cx="40%" cy="35%" r="65%">
+      <stop offset="0" stop-color="#f3c6ff"/>
+      <stop offset="1" stop-color="#9b3fd6"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="120" cy="236" rx="70" ry="9" fill="#000" opacity=".15"/>
+  <!-- 浮かぶ呪文 -->
+  <g fill="none" stroke="#c77dff" stroke-width="3" stroke-linecap="round" opacity=".85">
+    <circle cx="36" cy="76" r="10"/><path d="M30 76 L42 76 M36 70 L36 82"/>
+    <path d="M30 130 L42 120 L42 138 Z"/>
+    <circle cx="232" cy="190" r="8"/><path d="M226 184 L238 196"/>
+  </g>
+  <!-- 杖 -->
+  <path d="M198 66 L186 230" stroke="#5c3b1e" stroke-width="9" stroke-linecap="round"/>
+  <path d="M198 66 L186 230" stroke="#8a5a2e" stroke-width="4" stroke-linecap="round"/>
+  <path d="M186 60 Q198 40 212 58" fill="none" stroke="#5c3b1e" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="200" cy="48" r="26" fill="#c77dff" opacity=".25"/>
+  <circle cx="200" cy="48" r="15" fill="url(#orb)" stroke="#3a1a52" stroke-width="4"/>
+  <!-- ローブ -->
+  <path d="M120 40 Q170 60 172 120 L190 228 Q120 240 50 228 L68 120 Q70 60 120 40 Z"
+        fill="#3b2557" stroke="#1a0f28" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M120 128 L120 230" stroke="#2a1940" stroke-width="4"/>
+  <path d="M60 208 Q120 222 182 208" fill="none" stroke="#c77dff" stroke-width="4" opacity=".7"/>
+  <!-- フードの中 -->
+  <path d="M84 116 Q84 70 120 64 Q156 70 156 116 Q120 132 84 116 Z" fill="#120a1c"/>
+  <ellipse cx="106" cy="98" rx="7" ry="4" fill="#ff4fd8"/>
+  <ellipse cx="134" cy="98" rx="7" ry="4" fill="#ff4fd8"/>
+  <ellipse cx="106" cy="98" rx="12" ry="8" fill="#ff4fd8" opacity=".25"/>
+  <ellipse cx="134" cy="98" rx="12" ry="8" fill="#ff4fd8" opacity=".25"/>
+  <!-- 手 -->
+  <path d="M166 146 Q184 140 192 128" fill="none" stroke="#3b2557" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="192" cy="128" r="9" fill="#b8a6c9" stroke="#1a0f28" stroke-width="3"/>
+  <path d="M74 150 Q56 166 46 150" fill="none" stroke="#3b2557" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="44" cy="148" r="9" fill="#b8a6c9" stroke="#1a0f28" stroke-width="3"/>
+</svg>

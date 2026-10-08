@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <ellipse cx="124" cy="222" rx="100" ry="12" fill="#000" opacity=".15"/>
+  <!-- 足 -->
+  <g fill="#6f8f4e" stroke="#2c3a20" stroke-width="5" stroke-linejoin="round">
+    <rect x="48" y="176" width="34" height="42" rx="12"/>
+    <rect x="152" y="176" width="34" height="42" rx="12"/>
+  </g>
+  <!-- 頭 -->
+  <path d="M188 150 Q200 112 230 118 Q250 128 244 154 Q236 172 206 170 Z"
+        fill="#7da05a" stroke="#2c3a20" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M214 136 L232 132" stroke="#2c3a20" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="222" cy="140" r="5" fill="#2c3a20"/>
+  <path d="M226 160 L242 156" stroke="#2c3a20" stroke-width="3" stroke-linecap="round"/>
+  <!-- 甲羅 -->
+  <path d="M24 186 C24 96 92 70 128 70 C176 70 214 104 212 186 Z"
+        fill="#80838b" stroke="#2f3138" stroke-width="5" stroke-linejoin="round"/>
+  <g fill="#9a9da5" stroke="#2f3138" stroke-width="4" stroke-linejoin="round">
+    <path d="M96 84 L132 76 L156 100 L140 128 L104 126 L86 104 Z"/>
+    <path d="M44 150 L62 118 L94 132 L96 166 L66 178 L40 172 Z"/>
+    <path d="M110 140 L144 138 L162 164 L148 184 L108 184 L98 162 Z"/>
+    <path d="M164 108 L194 120 L204 154 L176 160 L160 134 Z"/>
+  </g>
+  <g fill="#c6c9cf" opacity=".7">
+    <path d="M104 90 L126 84 L132 92 L110 98 Z"/>
+    <path d="M56 134 L66 124 L78 132 L66 140 Z"/>
+    <path d="M118 148 L138 146 L142 154 L122 156 Z"/>
+  </g>
+  <!-- 甲羅のふち -->
+  <path d="M24 186 L212 186" stroke="#2f3138" stroke-width="5"/>
+  <rect x="22" y="184" width="192" height="12" rx="6" fill="#5e6168" stroke="#2f3138" stroke-width="4"/>
+</svg>

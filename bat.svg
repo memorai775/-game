@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <ellipse cx="128" cy="230" rx="50" ry="8" fill="#000" opacity=".12"/>
+  <!-- 風のライン -->
+  <g fill="none" stroke="#8fd3f4" stroke-width="4" stroke-linecap="round" opacity=".8">
+    <path d="M20 200 Q60 190 90 204"/>
+    <path d="M166 204 Q200 190 238 198"/>
+    <path d="M40 222 Q70 214 96 222"/>
+  </g>
+  <!-- 翼 -->
+  <g fill="#4a2f78" stroke="#22163a" stroke-width="5" stroke-linejoin="round">
+    <path d="M104 118 L64 62 L10 104 Q30 112 32 136 Q50 124 62 148 Q76 132 98 152 Z"/>
+    <path d="M152 118 L192 62 L246 104 Q226 112 224 136 Q206 124 194 148 Q180 132 158 152 Z"/>
+  </g>
+  <g fill="none" stroke="#7a5bb0" stroke-width="3" stroke-linecap="round">
+    <path d="M64 66 L44 122"/><path d="M64 66 L80 134"/>
+    <path d="M192 66 L212 122"/><path d="M192 66 L176 134"/>
+  </g>
+  <!-- 耳 -->
+  <path d="M100 104 L94 60 L122 92 Z" fill="#5b3f8c" stroke="#22163a" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M156 104 L162 60 L134 92 Z" fill="#5b3f8c" stroke="#22163a" stroke-width="5" stroke-linejoin="round"/>
+  <!-- 体 -->
+  <ellipse cx="128" cy="138" rx="40" ry="46" fill="#5b3f8c" stroke="#22163a" stroke-width="5"/>
+  <ellipse cx="128" cy="154" rx="24" ry="24" fill="#7c62ad"/>
+  <!-- 目 -->
+  <path d="M100 118 L122 128 L104 134 Z" fill="#ffd23f" stroke="#22163a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M156 118 L134 128 L152 134 Z" fill="#ffd23f" stroke="#22163a" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="110" cy="128" r="3" fill="#22163a"/><circle cx="146" cy="128" r="3" fill="#22163a"/>
+  <!-- 口と牙 -->
+  <path d="M112 148 Q128 158 144 148" fill="none" stroke="#22163a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M116 150 L120 162 L124 153 Z" fill="#fff" stroke="#22163a" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M140 150 L136 162 L132 153 Z" fill="#fff" stroke="#22163a" stroke-width="2" stroke-linejoin="round"/>
+  <!-- 足 -->
+  <path d="M114 182 L110 196 M142 182 L146 196" stroke="#22163a" stroke-width="5" stroke-linecap="round"/>
+</svg>
