@@ -20,7 +20,10 @@ const BATTLE_CONFIG = {
 
 // 表示用ラベル
 const STAT_LABELS = { hp: 'HP', atk: '攻撃', def: '防御', spd: '速度' };
-const ROLE_LABELS = { attacker: '攻撃役', tank: '守り役', healer: '回復役', support: '補助役', all: 'バランス' };
+const ROLE_LABELS = {
+  attacker: '攻撃役', tank: '守り役', healer: '回復役', support: '補助役', all: 'バランス',
+  speed: 'すばやさ・妨害', aoe: '全体攻撃', finisher: 'とどめ役', buffer: '味方の支援', combo: '連続攻撃', time: '行動順の操作',
+};
 const ENEMY_TYPE_LABELS = {
   normal: 'ふつう', fast: 'すばやい系', tough: 'かたい系', charge: 'ためる系',
   disrupt: '妨害系', heal: '回復系', special: '特殊', boss: 'ボス',
@@ -56,6 +59,14 @@ const ENEMY_TYPE_LABELS = {
 //   { type: 'revive', ratio: 0.5 }                     倒れた仲間を蘇生（スキルの target は 'deadAlly'）
 //   { type: 'toBack' }                                 相手の行動を一番後ろへ
 //   { type: 'selfKill' }                               自分が倒れる（爆弾岩の大爆発）
+//   { type: 'steal', chance: 0.3 }                     盗む（成功するとこの階のクリア時にアイテム選択が1回増える）
+//   { type: 'gaugeAfter', amount: 0.3 }                行動のあと、自分の行動ゲージを amount 進める
+//   { type: 'sleep' }                                  眠らせる（行動ゲージ0＋1回休み。ボスは行動ゲージ-50%だけ）
+//   { type: 'kiBurst', per: 0.8 }                      気を全部使い、気の数×per 倍のダメージ
+//   { type: 'fillGauge' }                              行動ゲージを満タンに（すぐ行動）
+//   { type: 'rewind', turns: 3 }                       HPを turns ターン前（その味方の行動で数える）の値に戻す
+//   damage に sureCritBelow: 0.3 を付けると、HPがその割合以下の相手には必ず会心
+// スキルに magic: true を付けると魔法の技（霊体に軽減されない）
 // 効果ごとに target: 'self' を書くと、その効果だけ自分にかかる（例：攻撃＋自分強化）
 // 効果ごとに target: 'allAllies' を書くと、その効果だけ自分の仲間全員にかかる（例：全体攻撃＋仲間強化）
 const SKILLS = {
@@ -92,6 +103,27 @@ const SKILLS = {
   dive:        { name: '急降下',     target: 'enemy', danger: true, desc: '2.5倍ダメージ', effects: [{ type: 'damage', power: 2.5 }] },
   abyssCharge: { name: '深淵の胎動', target: 'self', cooldown: 6, desc: '3ターン後に「深淵の炎」を放つ', effects: [{ type: 'countdown', skill: 'abyssFlame', turns: 3 }] },
   abyssFlame:  { name: '深淵の炎',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に3倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 3.0 }] },
+
+  // --- 15階以降に加入する仲間 ---
+  // oncePerBattle: 1戦闘1回（ボタンに「使用済み」と出る） / needsKi: 気がないと使えない
+  twinSlash:    { name: '二刀斬り',     target: 'enemy', desc: '敵1体に0.7倍×2回', effects: [{ type: 'damage', power: 0.7, hits: 2 }] },
+  shadowStitch: { name: '影縫い',       target: 'enemy', cooldown: 2, desc: '敵1体の行動ゲージ-40%', effects: [{ type: 'delay', amount: 0.4 }] },
+  steal:        { name: '盗む',         target: 'enemy', oncePerBattle: true, desc: '攻撃＋30%で盗む（成功するとこの階のクリア時にアイテムを1回多く選べる）。1戦闘1回', effects: [{ type: 'damage', power: 1.0 }, { type: 'steal', chance: 0.3 }] },
+  fireball:     { name: '火球',         target: 'enemy', magic: true, desc: '敵1体に1.4倍ダメージ', effects: [{ type: 'damage', power: 1.4 }] },
+  inferno:      { name: '爆炎',         target: 'allEnemies', cooldown: 2, magic: true, shake: true, desc: '敵全体に0.8倍ダメージ＋やけど（2ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
+  focus:        { name: '魔力集中',     target: 'self', cooldown: 3, desc: '次のスキルの効果2倍＋行動ゲージ+30%', effects: [{ type: 'status', status: 'focus', turns: 99 }, { type: 'gaugeAfter', amount: 0.3 }] },
+  aimedShot:    { name: '狙い撃ち',     target: 'weakestEnemy', desc: 'HPが一番低い敵に1.2倍ダメージ。HP30%以下の敵には必ず会心', effects: [{ type: 'damage', power: 1.2, sureCritBelow: 0.3 }] },
+  pinningArrow: { name: '足止めの矢',   target: 'enemy', cooldown: 2, desc: '敵1体に0.9倍ダメージ＋速度-20%（3ターン）', effects: [{ type: 'damage', power: 0.9 }, { type: 'buff', stat: 'spd', rate: 0.8, turns: 3 }] },
+  volley:       { name: '連射',         target: 'self', desc: 'ランダムな敵に0.5倍×4回', effects: [{ type: 'damageRandom', power: 0.5, count: 4 }] },
+  windSong:     { name: '疾風の歌',     target: 'allAllies', cooldown: 2, desc: '味方全員の速度+20%（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 1.2, turns: 3, tag: 'song_wind' }] },
+  braveSong:    { name: '勇気の歌',     target: 'allAllies', cooldown: 2, desc: '味方全員の攻撃+20%（3ターン）', effects: [{ type: 'buff', stat: 'atk', rate: 1.2, turns: 3, tag: 'song_brave' }] },
+  lullaby:      { name: '子守唄',       target: 'enemy', cooldown: 3, desc: '敵1体を眠らせる（行動ゲージ0＋1回休み。ボスには半分の効果）', effects: [{ type: 'sleep' }] },
+  comboStrike:  { name: '連撃',         target: 'enemy', desc: '敵1体に0.6倍×3回', effects: [{ type: 'damage', power: 0.6, hits: 3 }] },
+  hyakuretsu:   { name: '奥義・百烈拳', target: 'enemy', needsKi: true, danger: true, desc: '気を全部使い、気の数×0.8倍のダメージ', effects: [{ type: 'kiBurst', per: 0.8 }] },
+  stance:       { name: '構え',         target: 'self', cooldown: 2, desc: '次に受ける攻撃に反撃する', effects: [{ type: 'status', status: 'counterStance', turns: 1 }] },
+  timeHaste:    { name: '加速',         target: 'ally', cooldown: 1, desc: '味方1人の行動ゲージを満タンにする（すぐ行動）', effects: [{ type: 'fillGauge' }] },
+  timeStop:     { name: '時間停止',     target: 'allEnemies', cooldown: 3, desc: '敵全員の行動ゲージ-50%（4ターンに1回）', effects: [{ type: 'delay', amount: 0.5 }] },
+  rewind:       { name: '巻き戻し',     target: 'ally', oncePerBattle: true, desc: '味方1人のHPを3ターン前の値に戻す（1戦闘1回）', effects: [{ type: 'rewind', turns: 3 }] },
 
   // --- 灼熱の火山（21〜30階） ---
   flameBreath:   { name: '炎の息',     target: 'enemy', cooldown: 2, desc: '1.2倍ダメージ＋やけど', effects: [{ type: 'damage', power: 1.2 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
@@ -188,6 +220,16 @@ const STATUS_INFO = {
   shelled:   { icon: '🐚', name: '殻',   invulnerable: true, applyText: 'は殻にこもった！',     desc: () => '攻撃が効かない' },
   stone:     { icon: '🗿', name: '石化', invulnerable: true, applyText: 'は石になった！',       desc: () => '攻撃が効かない' },
   vulnerable:{ icon: '💔', name: '呪い', applyText: 'は呪われ、受けるダメージが増えた！',       desc: s => `受けるダメージ+${pct(s.value)}` },
+  // --- 15階以降の仲間で追加 ---
+  sleep:         { icon: '💤', name: '眠り',     skipTurn: true, applyText: 'は眠ってしまった！', desc: () => '次の行動を1回休む' },
+  focus:         { icon: '✨', name: '魔力集中', applyText: 'は魔力を集中している！',             desc: () => '次のスキルの効果が2倍' },
+  counterStance: { icon: '🥋', name: '構え',     applyText: 'は構えた！',                         desc: () => '次に受ける攻撃に反撃する' },
+};
+
+// 強化のうち、キャラの上にアイコンで出すもの（tag で判別。数字は残りターン）
+const BUFF_BADGES = {
+  song_wind:  { icon: '🎵', name: '疾風の歌' },
+  song_brave: { icon: '🎶', name: '勇気の歌' },
 };
 
 // ---------------------------------------------------------------------
@@ -223,8 +265,19 @@ const ELITE = {
 //       allyCount: 2             … ↑と組み合わせて「2人以上いる」
 //     enemyCharging: true        力をためている相手がいる
 //     hasBuff / notBuff: 'atk'   自分にその強化がかかっている／いない
+//     enemyCount: 2              生きている敵が2体以上
+//     enemyHpBelow: 0.3          HPがその割合以下の敵がいる
+//     enemySpdAtLeast: 140       速度がその値以上の敵がいる
+//     enemyDanger: true          大技を予告している敵がいる（行動順リストの ⚠）
+//     nextEnemyDanger: true      次に動く敵が大技を予告している
+//     allyMissingBuff: 'song_wind' その種類（tag）の強化がかかっていない味方がいる
+//     kiAtLeast: 5               気がその数以上（拳闘家）
+//     hasOtherAlly: true         自分以外の味方がいる
 //   target（省略可）:
 //     'charging'                 力をためている相手を狙う
+//     'nextEnemy' / 'danger'     次に動く敵 ／ 大技を予告している敵
+//     'fastest'                  一番速い敵
+//     'weakestAlly' / 'strongestAlly' HP割合が一番低い味方 ／ 攻撃が一番高い自分以外の味方
 //     省略時                     敵1体なら TARGET_PRIORITY の順、味方1体ならHP割合が一番低い仲間
 //   どのルールにも当てはまらなければ「攻撃」
 // join: 仲間になる条件（省略すると最初から仲間）。複数書くと全部満たしたとき加入
@@ -258,6 +311,69 @@ const CHARACTERS = {
     autoRules: [
       { skill: 'healAll', when: { allyHpBelow: 0.6, allyCount: 2 } },
       { skill: 'heal',    when: { allyHpBelow: 0.6 } },
+      { skill: 'attack' },
+    ],
+  },
+
+  // ---- 15階以降に加入する仲間 ----
+  thief: {
+    name: '盗賊', role: 'speed', image: 'characters/thief.png', hp: 150, atk: 26, def: 12, spd: 140,
+    join: { reachFloor: 15 },
+    skills: ['attack', 'defend', 'twinSlash', 'shadowStitch', 'steal'],
+    autoRules: [
+      { skill: 'shadowStitch', when: { nextEnemyDanger: true }, target: 'nextEnemy' }, // 次に動く敵が大技予告中なら止める
+      { skill: 'twinSlash' },
+    ],
+  },
+  mage: {
+    name: '魔法使い', role: 'aoe', image: 'characters/mage.png', hp: 120, atk: 34, def: 10, spd: 90,
+    join: { defeatBoss: 20 },
+    skills: ['attack', 'defend', 'fireball', 'inferno', 'focus'],
+    autoRules: [
+      { skill: 'inferno',  when: { enemyCount: 2 } }, // 敵が2体以上なら全体攻撃
+      { skill: 'fireball' },
+    ],
+  },
+  archer: {
+    name: '弓使い', role: 'finisher', image: 'characters/archer.png', hp: 140, atk: 30, def: 12, spd: 115,
+    join: { reachFloor: 25 },
+    skills: ['attack', 'defend', 'aimedShot', 'pinningArrow', 'volley'],
+    autoRules: [
+      { skill: 'aimedShot',    when: { enemyHpBelow: 0.3 } },
+      { skill: 'pinningArrow', when: { enemySpdAtLeast: 140 }, target: 'fastest' },
+      { skill: 'volley' },
+    ],
+  },
+  bard: {
+    name: '吟遊詩人', role: 'buffer', image: 'characters/bard.png', hp: 130, atk: 14, def: 12, spd: 120,
+    join: { defeatBoss: 30 },
+    skills: ['attack', 'defend', 'windSong', 'braveSong', 'lullaby'],
+    autoRules: [
+      { skill: 'lullaby',   when: { enemyDanger: true }, target: 'danger' }, // 大技予告中の敵を眠らせる
+      { skill: 'windSong',  when: { allyMissingBuff: 'song_wind' } },
+      { skill: 'braveSong', when: { allyMissingBuff: 'song_brave' } },
+      { skill: 'attack' },
+    ],
+  },
+  monk: {
+    name: '拳闘家', role: 'combo', image: 'characters/monk.png', hp: 190, atk: 28, def: 18, spd: 105,
+    join: { reachFloor: 35 },
+    ki: { max: 5, atkPer: 0.08 }, // 気：攻撃するたび1たまる（最大5）。気1つにつき攻撃+8%
+    skills: ['attack', 'defend', 'comboStrike', 'hyakuretsu', 'stance'],
+    autoRules: [
+      { skill: 'hyakuretsu',  when: { kiAtLeast: 5 } },
+      { skill: 'stance',      when: { hpBelow: 0.4 } },
+      { skill: 'comboStrike' },
+    ],
+  },
+  chronomancer: {
+    name: '時の魔導士', role: 'time', image: 'characters/chronomancer.png', hp: 130, atk: 20, def: 14, spd: 125,
+    join: { defeatBoss: 40 },
+    skills: ['attack', 'defend', 'timeHaste', 'timeStop', 'rewind'],
+    autoRules: [
+      { skill: 'timeStop',  when: { enemyDanger: true } },
+      { skill: 'rewind',    when: { allyHpBelow: 0.3 }, target: 'weakestAlly' },
+      { skill: 'timeHaste', when: { hasOtherAlly: true }, target: 'strongestAlly' },
       { skill: 'attack' },
     ],
   },

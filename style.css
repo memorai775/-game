@@ -1301,3 +1301,43 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 #stage.portrait .header-right { flex-wrap: nowrap; gap: 4px; }
 #stage.portrait .header-right button { padding: 5px 9px; font-size: 15px; }
 #stage.portrait #cloud-status { max-width: 260px; }
+/* 歌の効果・気（キャラの上のアイコン） */
+.sbadge.song { border-color: #6ad0a0; color: #c0ffe0; }
+.sbadge.ki   { border-color: #e0a040; color: #ffd8a0; }
+.sbadge.ki.full { background: #6a3a10; border-color: #ffd54a; color: #ffe48a; animation: badge-pulse 1.2s ease-in-out infinite; }
+.sbadge.sleep { border-color: #8a9ad0; color: #d0d8ff; }
+.sbadge.focus { border-color: #c08aff; color: #ecd8ff; }
+.sbadge.counterStance { border-color: #e0a040; color: #ffd8a0; }
+/* =====================================================================
+   縦画面で「強化」「アイテム」「ログ」を開いている間は、バトル部分を小さく
+   （キャラは小さなアイコン＋HPバーだけ。パネルを広く使える。「行動順」タブで元の大きさに戻る）
+   ===================================================================== */
+#stage.portrait:not([data-tab="order"]) .battle-main { gap: 3px; padding: 3px 6px 4px; }
+#stage.portrait:not([data-tab="order"]) .controls button { padding: 2px 8px; font-size: 12px; }
+#stage.portrait:not([data-tab="order"]) .controls > span:first-of-type { display: none; }
+#stage.portrait:not([data-tab="order"]) #bag-btn { width: 36px; height: 30px; font-size: 17px; top: 3px; }
+#stage.portrait:not([data-tab="order"]) .unit-row { flex-wrap: nowrap; gap: 3px; justify-content: flex-start; }
+#stage.portrait:not([data-tab="order"]) .unit { flex: 1 1 0; max-width: 90px; min-width: 0; padding: 2px 3px 3px; }
+#stage.portrait:not([data-tab="order"]) .unit .portrait,
+#stage.portrait:not([data-tab="order"]) .portrait-fallback { width: 34px !important; height: 34px !important; font-size: 1rem; }
+#stage.portrait:not([data-tab="order"]) .sprite-box { min-height: 34px !important; margin-bottom: 0; }
+#stage.portrait:not([data-tab="order"]) .unit .name { font-size: 9.5px; }
+#stage.portrait:not([data-tab="order"]) .hpbar { height: 4px; margin: 1px 0 0; }
+#stage.portrait:not([data-tab="order"]) .turn-badge,
+#stage.portrait:not([data-tab="order"]) .unit .sub,
+#stage.portrait:not([data-tab="order"]) .unit .hp-text,
+#stage.portrait:not([data-tab="order"]) .unit .stats,
+#stage.portrait:not([data-tab="order"]) .unit .status,
+#stage.portrait:not([data-tab="order"]) .traits,
+#stage.portrait:not([data-tab="order"]) .area-banner { display: none; }
+#stage.portrait:not([data-tab="order"]) .sbadge { font-size: 8px; padding: 0 3px; }
+#stage.portrait:not([data-tab="order"]) .num { font-size: 0.85rem; }
+#stage.portrait:not([data-tab="order"]) .speech { display: none; }
+#stage.portrait:not([data-tab="order"]) .unit.ally  .actor.step { transform: translateY(-8px); }
+#stage.portrait:not([data-tab="order"]) .unit.enemy .actor.step { transform: translateY(8px); }
+/* コマンド欄は、自分で技を選ぶ番（ボタンがあるとき）だけ出す */
+#stage.portrait:not([data-tab="order"]) #command-area:not(:has(#command-buttons button)) { display: none; }
+#stage.portrait:not([data-tab="order"]) #command-title { font-size: 11px; margin-bottom: 2px; min-height: 0; }
+#stage.portrait:not([data-tab="order"]) #command-buttons button { padding: 6px 2px; font-size: 12px; }
+#stage.portrait:not([data-tab="order"]) #skill-desc { display: none; }
+#stage.portrait:not([data-tab="order"]) #result { font-size: 13px; padding: 6px; }

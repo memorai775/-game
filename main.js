@@ -60,6 +60,11 @@ function createUnit(template, side, name, stats = null, level = 1) {
     elite: false,        // 強化個体か
     gear: null,          // 装備アイテムの効果（味方のみ。progress.js の itemEffects の結果）
     dealtDamage: false,  // この行動でダメージを与えたか（疾風剣の判定用）
+    ki: 0,                                        // 気（拳闘家）
+    kiMax: template.ki ? template.ki.max : 0,     // 気の上限（0 なら気を使わないキャラ）
+    kiAtk: template.ki ? template.ki.atkPer : 0,  // 気1つあたりの攻撃アップ
+    hpHistory: [],       // 自分の行動開始時のHPの記録（巻き戻し用）
+    nextHaste: 0,        // 行動のあとに進める行動ゲージ（魔力集中）
     exp: template.exp || 0,
   };
 }
@@ -88,6 +93,8 @@ function getStat(unit, stat) {
   // 巨人の盾：HPが減ると防御が上がる
   const lowHp = stat === 'def' && gearSpecial(unit, 'lowHpDefense');
   if (lowHp && unit.hp / unit.base.hp <= lowHp.threshold) value *= lowHp.rate;
+  // 気（拳闘家）：気1つにつき攻撃アップ
+  if (stat === 'atk' && unit.ki > 0) value *= 1 + unit.ki * unit.kiAtk;
   // 状態異常による防御倍率（毒フグのふくらみなど）
   if (stat === 'def') {
     for (const s of unit.statuses) value *= STATUS_INFO[s.id].defRate || 1;
@@ -274,7 +281,8 @@ function strike(b, user, target, opts = {}) {
   let crit = false;
   if (!opts.noCrit && !trait(target, 'critImmune') && !gearSpecial(target, 'critImmune')) {
     const canCrit = !opts.isSkill || gearSpecial(user, 'skillCrit');
-    const sure = (trait(user, 'executeCrit') && targetLow) || (gearSpecial(user, 'firstCrit') && firstAttack);
+    const sure = (trait(user, 'executeCrit') && targetLow) || (gearSpecial(user, 'firstCrit') && firstAttack)
+      || (opts.sureCritBelow && target.hp / target.base.hp <= opts.sureCritBelow); // 狙い撃ち：弱った相手に必ず会心
     if (sure || (canCrit && Math.random() < gearBonus(user, 'critRate'))) {
       crit = true;
       dmg *= ITEM_CONFIG.baseCritMultiplier + gearBonus(user, 'critDamage');
@@ -371,9 +379,14 @@ function strike(b, user, target, opts = {}) {
     }
   }
 
-  // 8. 反撃（反撃の鎧・カニ騎士）：攻撃が全部終わってから行う
+  // 8. 反撃（反撃の鎧・カニ騎士・拳闘家の構え）：攻撃が全部終わってから行う
+  const canCounter = !opts.isCounter && target.alive && user.alive && user.side !== target.side;
   const counter = gearSpecial(target, 'counter') || trait(target, 'counter');
-  if (counter && !opts.isCounter && target.alive && user.alive && user.side !== target.side && Math.random() < counter.chance) {
+  if (canCounter && hasStatus(target, 'counterStance')) {
+    // 構え：次に受けた攻撃に必ず反撃（1回で構えは解ける）
+    target.statuses = target.statuses.filter(s => s.id !== 'counterStance');
+    b.counters.push({ by: target, to: user });
+  } else if (counter && canCounter && Math.random() < counter.chance) {
     b.counters.push({ by: target, to: user });
   }
 
@@ -392,11 +405,12 @@ const EFFECT_HANDLERS = {
   damage(b, user, target, eff) {
     const skill = SKILLS[b.skillId];
     const opts = {
-      power: eff.power ?? 1,
+      power: (eff.power ?? 1) * (eff.isCounter ? 1 : b.skillMult), // 魔力集中なら2倍
       isSkill: b.skillId !== 'attack', // 通常攻撃以外は「スキル」
       aoe: skill && (skill.target === 'allEnemies' || skill.target === 'allAllies'),
       isCounter: !!eff.isCounter,
       magic: !!(skill && skill.magic), // 魔法の技（霊体に軽減されない）
+      sureCritBelow: eff.sureCritBelow, // 狙い撃ち
     };
     const hits = eff.hits || 1;
     for (let i = 0; i < hits && target.alive && user.alive; i++) strike(b, user, target, opts);
@@ -407,6 +421,7 @@ const EFFECT_HANDLERS = {
     let amount = target.base.hp * eff.ratio;
     amount *= 1 + gearBonus(user, 'healPower');   // 癒しの杖
     amount *= 1 + gearBonus(user, 'skillPower');  // 回復はすべてスキル
+    amount *= b.skillMult;                         // 魔力集中なら2倍
     const healed = restoreHp(b, target, amount);
     if (healed === 0) b.log(`${target.name}のHPは満タンだ。`, 'heal');
     b.track(Anim.heal(target));
@@ -463,7 +478,70 @@ const EFFECT_HANDLERS = {
     for (let i = 0; i < eff.count && user.alive; i++) {
       const opp = b.opponentsOf(user);
       if (opp.length === 0) break;
-      strike(b, user, opp[Math.floor(Math.random() * opp.length)], { power: eff.power, isSkill: true, aoe: true });
+      strike(b, user, opp[Math.floor(Math.random() * opp.length)], { power: eff.power * b.skillMult, isSkill: true, aoe: true });
+    }
+  },
+
+  // ---- 15階以降の仲間のスキル ----
+  // 盗む：成功するとこの階のクリア時にアイテム選択が1回増える（1戦闘1回まで）
+  steal(b, user, target, eff) {
+    if (b.stolen) return;
+    if (Math.random() < eff.chance) {
+      b.stolen = true;
+      b.log(`${user.name}は${target.name}から何かを盗んだ！（この階をクリアするとアイテムを1回多く選べる）`, 'system');
+      Anim.number(user, '盗んだ！', 'heal');
+    } else {
+      b.log('盗めなかった…', 'info');
+    }
+  },
+
+  // 行動のあと、自分の行動ゲージを進める（魔力集中）
+  gaugeAfter(b, user, target, eff) {
+    user.nextHaste = eff.amount;
+  },
+
+  // 眠らせる：行動ゲージ0＋1回休み。ボスは行動ゲージ-50%だけ（効果半分）
+  sleep(b, user, target) {
+    if (target.type === 'boss') {
+      target.wait += b.fullWait(target) * 0.5;
+      b.log(`${target.name}は眠気に耐えた…が、行動が遅れた！`, 'info');
+      return;
+    }
+    target.wait = b.fullWait(target);
+    applyStatus(b, target, 'sleep', 0, 2); // 次の自分のターンで1回休み、その次に目覚める
+  },
+
+  // 奥義・百烈拳：気を全部使い、気の数×per 倍のダメージ
+  kiBurst(b, user, target, eff) {
+    const ki = user.ki;
+    if (ki <= 0) return;
+    b.log(`${user.name}は気を${ki}つ解き放った！`, 'system');
+    strike(b, user, target, { power: ki * eff.per * b.skillMult, isSkill: true });
+    user.ki = 0;
+  },
+
+  // 行動ゲージを満タンに（すぐ行動）
+  fillGauge(b, user, target) {
+    if (target === user) {
+      b.log(`${user.name}自身の時間は早められない…`, 'info');
+      return;
+    }
+    target.wait = 0;
+    b.log(`${target.name}の時間が加速した！ すぐに行動できる！`, 'info');
+  },
+
+  // 巻き戻し：HPを turns ターン前（その味方の行動で数える）の値に戻す。今より低くはしない
+  rewind(b, user, target, eff) {
+    const h = target.hpHistory;
+    const past = h.length ? h[Math.max(0, h.length - eff.turns)] : target.hp;
+    const before = target.hp;
+    target.hp = Math.min(target.base.hp, Math.max(target.hp, past));
+    if (target.hp > before) {
+      b.log(`${target.name}の時間が巻き戻り、HPが ${target.hp} に戻った！`, 'heal');
+      Anim.number(target, `+${target.hp - before}`, 'heal');
+      b.track(Anim.heal(target));
+    } else {
+      b.log(`${target.name}の時間を巻き戻したが、HPは変わらなかった。`, 'info');
     }
   },
 
@@ -536,6 +614,19 @@ function checkCondition(b, unit, when) {
   if (when.notStatus && hasStatus(unit, when.notStatus)) return false;
   if (when.noCountdown && (unit.countdown || unit.forcedSkill)) return false;
   if (when.allyDead && !b.deadFriendsOf(unit).length) return false;
+  // ---- 15階以降の仲間のオート用 ----
+  const opp = b.opponentsOf(unit);
+  if (when.enemyCount !== undefined && opp.length < when.enemyCount) return false;
+  if (when.enemyHpBelow !== undefined && !opp.some(o => o.hp / o.base.hp <= when.enemyHpBelow)) return false;
+  if (when.enemySpdAtLeast !== undefined && !opp.some(o => getStat(o, 'spd') >= when.enemySpdAtLeast)) return false;
+  if (when.enemyDanger && !opp.some(o => b.dangerOf(o))) return false;
+  if (when.nextEnemyDanger) {
+    const next = b.nextOpponent(unit);
+    if (!next || !b.dangerOf(next)) return false;
+  }
+  if (when.allyMissingBuff && !b.friendsOf(unit).some(f => !f.buffs.some(x => x.tag === when.allyMissingBuff))) return false;
+  if (when.kiAtLeast !== undefined && unit.ki < when.kiAtLeast) return false;
+  if (when.hasOtherAlly && b.friendsOf(unit).length < 2) return false;
   if (when.enemyCharging && !b.opponentsOf(unit).some(isCharging)) return false;
   if (when.allyHpBelow !== undefined) {
     const hurt = b.friendsOf(unit).filter(u => u.hp / u.base.hp < when.allyHpBelow).length;
@@ -648,6 +739,8 @@ class Battle {
     this.pending = [];       // 再生中のアニメーション（終わるまで次へ進まない）
     this.counters = [];      // この行動のあとに行う反撃 [{ by, to }]
     this.skillId = null;     // 今使っているスキル
+    this.skillMult = 1;      // 今のスキルの効果倍率（魔力集中で2倍）
+    this.stolen = false;     // 盗賊の「盗む」が成功したか（この階のクリア時にアイテム選択+1回）
     this.over = false;
     this.turnCount = 0;
     // 最初の待ち時間 = 10000 ÷ 速度
@@ -760,16 +853,25 @@ class Battle {
   // 実際に待ち時間・速度変化だけを仮に適用して予測し、すぐ元に戻す
   previewEntries(user, skillId, targets, count) {
     const saved = this.units.map(u => ({ u, wait: u.wait, buffs: u.buffs.map(x => ({ ...x })) }));
+    let afterHaste = 0;
     for (const eff of SKILLS[skillId].effects) {
-      const effTargets = eff.target === 'self' ? [user] : targets;
+      const effTargets = eff.target === 'self' ? [user]
+        : eff.target === 'allAllies' ? this.friendsOf(user)
+        : targets;
       for (const t of effTargets) {
         if (!t.alive) continue;
-        if (eff.type === 'delay')  t.wait += this.fullWait(t) * eff.amount;
+        if (eff.type === 'delay')  t.wait += this.fullWait(t) * eff.amount;      // 影縫い・時間停止など
         if (eff.type === 'hasten') t.wait = Math.max(0, t.wait - this.fullWait(t) * eff.amount);
         if (eff.type === 'buff' && eff.stat === 'spd') applyBuff(t, eff, t === user);
+        if (eff.type === 'fillGauge' && t !== user) t.wait = 0;                   // 加速：すぐ行動
+        if (eff.type === 'sleep') {
+          // 子守唄：行動ゲージ0＋1回休み（＝満タン2回分待つ）。ボスは行動ゲージ-50%だけ
+          t.wait = t.type === 'boss' ? t.wait + this.fullWait(t) * 0.5 : this.fullWait(t) * 2;
+        }
+        if (eff.type === 'gaugeAfter') afterHaste = eff.amount;                  // 魔力集中
       }
     }
-    user.wait = this.fullWait(user); // 行動後の待ち時間リセット
+    user.wait = this.fullWait(user) * (1 - afterHaste); // 行動後の待ち時間リセット
     const after = this.predictOrder(count - 1);
     for (const s of saved) { s.u.wait = s.wait; s.u.buffs = s.buffs; }
 
@@ -856,6 +958,9 @@ class Battle {
     // 魅了は「この行動」に効くので、残りターンが減る前に調べておく
     const charmed = hasStatus(actor, 'charm');
     if (actor.chainCount === 0) { // 連続行動の2回目以降はカウントしない
+      // 巻き戻し用：自分の行動開始時のHPを記録（新しい5回分）
+      actor.hpHistory.push(actor.hp);
+      if (actor.hpHistory.length > 5) actor.hpHistory.shift();
       this.tickStatuses(actor);
       this.turnStartItems(actor);
       const regen = trait(actor, 'regen');
@@ -984,16 +1089,42 @@ class Battle {
   ruleTargets(user, rule) {
     const skill = SKILLS[rule.skill];
     const opp = this.opponentsOf(user);
+    const fri = this.friendsOf(user);
     if (rule.target === 'charging') {
       const charging = opp.filter(isCharging);
       if (charging.length) return [lowestHp(charging)];
+    }
+    if (rule.target === 'nextEnemy') {        // 次に動く敵
+      const next = this.nextOpponent(user);
+      if (next) return [next];
+    }
+    if (rule.target === 'danger') {           // 大技を予告している敵
+      const d = opp.filter(o => this.dangerOf(o));
+      if (d.length) return [d[0]];
+    }
+    if (rule.target === 'fastest' && opp.length) {
+      return [opp.reduce((a, c) => (getStat(c, 'spd') > getStat(a, 'spd') ? c : a))];
+    }
+    if (rule.target === 'weakestAlly' && fri.length) {
+      return [fri.reduce((a, c) => (c.hp / c.base.hp < a.hp / a.base.hp ? c : a))];
+    }
+    if (rule.target === 'strongestAlly') {    // 攻撃が一番高い、自分以外の味方
+      const others = fri.filter(f => f !== user);
+      if (others.length) return [others.reduce((a, c) => (getStat(c, 'atk') > getStat(a, 'atk') ? c : a))];
     }
     if (skill.target === 'enemy') return [priorityTarget(opp)];
     return this.autoTargets(user, skill);
   }
 
-  // スキルを使えるか（クールダウン中でないか）
+  // 相手側で次に行動するユニット（行動順の予測で一番先の相手）
+  nextOpponent(unit) {
+    const next = this.orderEntries(BATTLE_CONFIG.orderPreview).find(e => e.unit.side !== unit.side && e.unit !== this.current);
+    return next ? next.unit : null;
+  }
+
+  // スキルを使えるか（クールダウン中でない・気が必要な技は気がある）
   canUse(unit, skillId) {
+    if (SKILLS[skillId].needsKi && !(unit.ki > 0)) return false;
     return !(unit.cooldowns[skillId] > 0);
   }
 
@@ -1015,6 +1146,7 @@ class Battle {
         if (trait(user, 'targetWeakest')) return [byRatio(opp)];
         return [opp[Math.floor(Math.random() * opp.length)]];
       case 'allEnemies': return opp;
+      case 'weakestEnemy': return opp.length ? [lowestHp(opp)] : []; // 狙い撃ち：HPが一番低い敵（自動で狙う）
       case 'self':       return [user];
       case 'ally':       return [byRatio(fri)];
       case 'allAllies':  return fri;
@@ -1048,9 +1180,17 @@ class Battle {
     const skill = SKILLS[skillId];
     this.log(`${user.name}の${skill.name}！`);
 
+    // 魔力集中：次のスキル（通常攻撃・防御・魔力集中そのもの以外）の効果を2倍にして解ける
+    this.skillMult = 1;
+    if (hasStatus(user, 'focus') && !['attack', 'defend', 'focus'].includes(skillId)) {
+      this.skillMult = 2;
+      user.statuses = user.statuses.filter(s => s.id !== 'focus');
+      this.log('集中した魔力で、効果が2倍になった！', 'system');
+    }
+
     // 相手にダメージを与えるスキルなら、踏み込んだタイミングでダメージ
     const isAttack = skill.effects.some(e =>
-      (e.type === 'damage' && e.target !== 'self') || e.type === 'damageRandom');
+      (e.type === 'damage' && e.target !== 'self') || e.type === 'damageRandom' || e.type === 'kiBurst');
     if (isAttack) await Anim.stepIn(user);
     if (battle !== this) return; // 途中でやり直しになった
     if (skill.shake) this.track(Anim.shakeScreen());
@@ -1063,10 +1203,12 @@ class Battle {
         : eff.target === 'allAllies' ? this.friendsOf(user)
         : targets;
       for (const t of effTargets) {
-        if (!t.alive && eff.type !== 'revive') continue; // 倒れた相手には効果なし（蘇生は別）
+        // 倒れた相手には効果なし（蘇生と、とどめを刺した相手から盗むのは別）
+        if (!t.alive && eff.type !== 'revive' && eff.type !== 'steal') continue;
         handler(this, user, t, eff);
       }
     }
+    this.skillMult = 1;
     UI.render(this);
 
     if (isAttack) this.track(Anim.stepOut(user));
@@ -1127,6 +1269,10 @@ class Battle {
     unit.forcedSkill = null;
     this.log(`${unit.name}は倒れた！`, 'system');
     this.track(Anim.defeat(unit));
+    // 📖図鑑に記録（初めて倒した敵ならお知らせ）
+    if (unit.side === 'enemy' && unit.templateId && recordDefeat(unit.templateId, this.floor)) {
+      this.log(`📖 ${ENEMIES[unit.templateId].name}が図鑑に登録された！`, 'system');
+    }
 
     // 呪い（呪術師）：倒した相手の能力を下げる
     const curse = trait(unit, 'curseOnDeath');
@@ -1255,7 +1401,8 @@ class Battle {
     for (const id in user.cooldowns) {
       if (user.cooldowns[id] > 0) user.cooldowns[id]--;
     }
-    const cd = usedSkillId && SKILLS[usedSkillId].cooldown;
+    // 1戦闘1回の技は、その戦闘中はもう使えない（クールダウンを大きくしておく）
+    const cd = usedSkillId && (SKILLS[usedSkillId].oncePerBattle ? 9999 : SKILLS[usedSkillId].cooldown);
     if (cd) user.cooldowns[usedSkillId] = cd;
 
     // 加速（機械兵）：行動するたびに速度が上がる
@@ -1269,6 +1416,8 @@ class Battle {
       if (dOn) stackBuff(user, 'def', dOn.rate, 'knightSword', Math.pow(dOn.rate, dOn.max));
       const hOn = gearSpecial(user, 'healOnAttack');                 // 祝福の剣
       if (hOn) restoreHp(this, user, user.base.hp * hOn.ratio, '（祝福の剣）');
+      // 気（拳闘家）：攻撃するたびに1たまる（百烈拳で使い切ったときは増えない）
+      if (user.kiMax && usedSkillId !== 'hyakuretsu' && user.ki < user.kiMax) user.ki++;
     }
 
     // バフの残りターンを減らし、切れたものを消す
@@ -1287,6 +1436,12 @@ class Battle {
     // 待ち時間をリセット（10000 ÷ 現在の速度）
     if (user.alive) user.wait = this.fullWait(user);
     this.current = null;
+
+    // 魔力集中：行動のあと、行動ゲージを進める
+    if (user.nextHaste && user.alive) {
+      user.wait = Math.max(0, user.wait - this.fullWait(user) * user.nextHaste);
+      user.nextHaste = 0;
+    }
 
     // 風読みの羽：スキル（通常攻撃以外）を使ったあと、行動ゲージを進める
     const sh = gearSpecial(user, 'skillHaste');
@@ -1481,10 +1636,17 @@ const UI = {
     if (u.alive) {
       for (const s of u.statuses) {
         const info = STATUS_INFO[s.id];
-        badges.push(`<span class="sbadge ${s.id}" title="${info.name}：${info.desc(s)}">${info.icon}${s.turns}</span>`);
+        badges.push(`<span class="sbadge ${s.id}" title="${info.name}：${info.desc(s)}">${info.icon}${s.turns >= 99 ? '' : s.turns}</span>`);
       }
       if (u.countdown) badges.push(`<span class="sbadge countdown" title="${SKILLS[u.countdown.skill].name}まで あと${u.countdown.turns}ターン">⏳${u.countdown.turns}</span>`);
       if (u.dormant) badges.push('<span class="sbadge dormant" title="擬態中（攻撃されるまで動かない）">💤</span>');
+      // 歌などの強化（tag が BUFF_BADGES にあるもの）：アイコン＋残りターン
+      for (const bf of u.buffs) {
+        const bb = BUFF_BADGES[bf.tag];
+        if (bb) badges.push(`<span class="sbadge song" title="${bb.name}：${STAT_LABELS[bf.stat]}×${bf.rate}（あと${bf.turns}ターン）">${bb.icon}${bf.turns}</span>`);
+      }
+      // 気（拳闘家）
+      if (u.kiMax) badges.push(`<span class="sbadge ki${u.ki >= u.kiMax ? ' full' : ''}" title="気：${u.ki}/${u.kiMax}（気1つにつき攻撃+${Math.round(u.kiAtk * 100)}%）">気${u.ki}</span>`);
     }
     d.badges.innerHTML = badges.join('');
 
@@ -1567,7 +1729,13 @@ const UI = {
     for (const id of actor.skills) {
       const skill = SKILLS[id];
       const cd = actor.cooldowns[id] || 0;
-      const label = cd > 0 ? `${skill.name}（あと${cd}）` : skill.name;
+      // 使えない理由をボタンに出す：1戦闘1回は「使用済み」、気が必要な技は「気が必要」、それ以外は残りターン
+      const label = skill.oncePerBattle && cd > 0 ? `${skill.name}（使用済み）`
+        : cd > 0 ? `${skill.name}（あと${cd}）`
+        : skill.needsKi && !(actor.ki > 0) ? `${skill.name}（気が必要）`
+        : skill.needsKi ? `${skill.name}（気${actor.ki}）`
+        : skill.oncePerBattle ? `${skill.name}（1戦闘1回）`
+        : skill.name;
       // プレビューの対象：敵1体ならオートと同じ優先順の敵（対象選択画面では、選ぶ相手ごとにプレビュー）
       const previewTargets = () => skill.target === 'enemy'
         ? [priorityTarget(b.opponentsOf(actor))]
@@ -1947,6 +2115,13 @@ function onBattleEnd(b, win) {
       const msg = `全体レベルが ${gameState.globalLevel} に上がった！ ポイント +${gained.points}`;
       b.log(msg, 'system');
       detail += `<br>${msg}`;
+    }
+
+    // 盗賊の「盗む」が成功していたら、アイテム選択が1回増える
+    if (b.stolen) {
+      grantBonusReward(b.floor);
+      b.log('盗んだお宝！ アイテムを1回多く選べる！', 'system');
+      detail += '<br>盗んだお宝：アイテムを1回多く選べます！';
     }
 
     // 味方のHPを記録し、戦闘の合間の回復（倒れていた味方も回復して次へ）

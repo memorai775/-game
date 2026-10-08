@@ -144,6 +144,7 @@ const UnitDetail = {
           ${statRow('atk', '攻撃')}${statRow('def', '防御')}${statRow('spd', '速さ')}
           <tr><th>行動順</th><td>${turnText}</td></tr>
           ${u.side === 'ally' ? `<tr><th>レベル</th><td>${u.level}</td></tr>` : ''}
+          ${u.kiMax ? `<tr><th>気</th><td>${u.ki} / ${u.kiMax}（攻撃+${Math.round(u.ki * u.kiAtk * 100)}%）</td></tr>` : ''}
         </table>
         ${intent ? `<div class="detail-intent">${escapeHtml(intent)}</div>` : ''}
         <div class="detail-sec">バフ・デバフ・状態</div>
