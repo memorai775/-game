@@ -635,6 +635,13 @@ function checkCondition(b, unit, when) {
   return true;
 }
 
+// 軽量モードか（設定が「自動」なら、タッチ操作の端末＝スマホ・タブレットで ON）
+function isLiteMode() {
+  const v = gameState.settings.lite;
+  if (v === true || v === false) return v;
+  return window.matchMedia('(pointer: coarse)').matches;
+}
+
 // 戦闘速度に合わせた待ち時間
 function scaledDelay(ms) {
   return ms / gameState.settings.speed;
@@ -646,9 +653,55 @@ function sleep(ms) {
 }
 
 // 指定ミリ秒（×1 のとき）あとに fn を実行する。一時停止中は再開してから実行（ゲームの進行はすべてこれを使う）
+// fn の中でエラーが起きても、画面に出して見張り役（下の Watchdog）が立て直せるようにする
 function later(fn, ms) {
-  setTimeout(() => whenRunning().then(fn), scaledDelay(ms));
+  setTimeout(() => whenRunning().then(fn).catch(reportError), scaledDelay(ms));
 }
+
+// ---------------------------------------------------------------------
+// エラーの表示と、進行が止まったときの立て直し
+// ---------------------------------------------------------------------
+// エラーが起きたら画面の下に出す（スクリーンショットで原因を調べられるように）
+function reportError(e) {
+  const msg = (e && (e.message || e.reason && e.reason.message)) || String(e);
+  console.error(e);
+  if (typeof showToast === 'function') showToast(`⚠ エラー：${msg}`);
+  if (battle) battle.log(`⚠ エラーが起きました：${msg}`, 'system');
+}
+window.addEventListener('error', e => reportError(e.error || e.message));
+window.addEventListener('unhandledrejection', e => reportError(e.reason));
+
+// 見張り役：戦闘が一定時間まったく進まなかったら、次の行動から再開する
+// （プレイヤーの入力待ち・一時停止中・エンディング中・画面を閉じている間は数えない）
+const Watchdog = {
+  LIMIT_MS: 15000,
+  lastProgress: Date.now(),
+
+  // 戦闘が進んだら呼ぶ
+  tick() { this.lastProgress = Date.now(); },
+
+  check() {
+    const b = battle;
+    const endingOpen = !document.getElementById('ending').classList.contains('hidden');
+    if (!b || document.hidden || Game.paused || endingOpen || b.waitingInput) { this.tick(); return; }
+    if (Date.now() - this.lastProgress < this.LIMIT_MS) return;
+    this.tick();
+    console.warn('進行が止まっていたので立て直します', b.current && b.current.name);
+    showToast('進行が止まっていたので再開しました');
+    b.pending = [];
+    b.counters = [];
+    if (b.over) {
+      startFloor();                    // 次の階へ進めなかった
+    } else if (b.current) {
+      const c = b.current;
+      b.endTurn(c, null);              // 行動の途中で止まった → その行動を終わらせる
+    } else {
+      b.next();                        // 次の行動が始まらなかった
+    }
+  },
+};
+setInterval(() => Watchdog.check(), 3000);
+document.addEventListener('visibilitychange', () => Watchdog.tick()); // 戻ってきた直後に誤作動しないように
 
 // ---------------------------------------------------------------------
 // アニメーション（見た目は style.css、ここではクラスの付け外しとタイミングだけ）
@@ -940,6 +993,7 @@ class Battle {
 
   // 次の行動へ
   next() {
+    Watchdog.tick();
     if (this.over || this.checkEnd()) return;
 
     const actor = this.advanceTime();
@@ -1396,6 +1450,7 @@ class Battle {
 
   // 行動終了の処理（usedSkillId：使ったスキル。何もしなかったときは null）
   endTurn(user, usedSkillId) {
+    Watchdog.tick();
     user.actCount++;
     // クールダウンを1減らしてから、今使ったスキルのクールダウンを設定
     for (const id in user.cooldowns) {
@@ -1489,6 +1544,7 @@ class Battle {
   }
 
   finish(win) {
+    Watchdog.tick();
     this.over = true;
     this.current = null;
     this.waitingInput = false;
@@ -1803,6 +1859,8 @@ const UI = {
     document.documentElement.style.setProperty('--speed', s.speed);
     // 設定「ステータスを常に表示」：OFF ならカードは名前・HPバー・行動順だけ
     document.getElementById('stage').classList.toggle('show-stats', !!s.showStats);
+    // 設定「軽量モード」：重い見た目の効果を減らす（スマホで絵が止まるのを防ぐ）
+    document.getElementById('stage').classList.toggle('lite', isLiteMode());
     for (const btn of this.el.speedBtns.children) {
       btn.classList.toggle('active', Number(btn.dataset.speed) === s.speed);
     }

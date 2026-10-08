@@ -1341,3 +1341,35 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 #stage.portrait:not([data-tab="order"]) #command-buttons button { padding: 6px 2px; font-size: 12px; }
 #stage.portrait:not([data-tab="order"]) #skill-desc { display: none; }
 #stage.portrait:not([data-tab="order"]) #result { font-size: 13px; padding: 6px; }
+/* 重なり順の整理：お知らせ・エンディングは、バトル画面の勝敗メッセージや🎒ボタン、
+   キャラの詳細パネルより必ず上に出す（下に隠れて OK が押せなくならないように） */
+#stage #ending { z-index: 47; }
+#stage #popup  { z-index: 48; }
+#modal         { z-index: 50; }
+#toast         { z-index: 60; }
+/* =====================================================================
+   軽量モード（#stage.lite）：スマホで絵が止まらないよう、重い効果を減らす
+   ・動いている絵（とその親）に付いた filter（影・色変え）をやめる … 毎フレーム描き直しになって重いため
+   ・ずっと光り続ける・点滅し続けるアニメーションを止めて、色で表す
+   キャラの揺れ・攻撃の踏み込み・ダメージ表示などの軽い動きはそのまま
+   ===================================================================== */
+#stage.lite .unit .portrait { filter: none; will-change: transform; }
+#stage.lite .aura,
+#stage.lite .aura.charging,
+#stage.lite .unit.enraged .aura,
+#stage.lite .unit.dormant .aura { filter: none !important; animation: none !important; }
+/* 力をためている・怒り・擬態は、カードの枠の色で表す */
+#stage.lite .unit:has(.aura.charging) { border-color: #ff4a4a; box-shadow: inset 0 0 0 1px #ff4a4a; }
+#stage.lite .unit.enraged { border-color: #ff7a3a; background: #3a2630; }
+#stage.lite .unit.dormant { opacity: 0.85; }
+/* 強化個体のオーラは動かさない */
+#stage.lite .unit.elite .sprite-box::before { animation: none; opacity: 0.7; }
+/* 光り続ける・点滅し続けるもの → 止めた見た目に */
+#stage.lite .order-row.now { animation: none; box-shadow: 0 0 6px var(--glow); }
+#stage.lite .order-row.danger { animation: none; background: #5a2020; }
+#stage.lite .sbadge.countdown { animation: none; background: #5a2020; }
+#stage.lite .sbadge.ki.full { animation: none; }
+#stage.lite #reward-badge { animation: none; box-shadow: 0 0 6px rgba(255, 213, 74, 0.7); }
+#stage.lite .recipe-row.ready,
+#stage.lite .zukan-card.ready { animation: none; box-shadow: 0 0 6px rgba(255, 213, 74, 0.6); }
+#stage.lite .rotate-icon { animation: none; }

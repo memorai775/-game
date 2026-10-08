@@ -21,6 +21,8 @@ const Panel = {
     ItemUI.message = '';
     const panel = document.getElementById('side-panel');
     panel.dataset.tab = name; // CSS で幅や位置を切り替える
+    // 縦画面で強化・アイテム・ログを開いている間は、バトル部分を小さくする（CSS で切り替え）
+    document.getElementById('stage').dataset.tab = name;
     for (const btn of document.querySelectorAll('#panel-tabs button')) {
       btn.classList.toggle('active', btn.dataset.tab === name);
     }

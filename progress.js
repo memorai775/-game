@@ -23,12 +23,14 @@ function newGameState() {
     floor: 1,         // 現在の階
     maxFloor: 1,      // 最高到達階
     checkpoint: 1,    // 全滅時に戻る階
-    settings: { auto: false, speed: 1, showStats: false }, // オートバトル・戦闘速度・ステータスを常に表示
+    // オートバトル・戦闘速度・ステータスを常に表示・軽量モード（null ＝ 自動：スマホなら ON）
+    settings: { auto: false, speed: 1, showStats: false, lite: null },
     lastSaved: null,  // 最後に保存した時刻（放置経験値の計算に使う）
     inventory: [],      // 所持品（装備していないアイテムのID。同じものは複数並ぶ）
     equips: {},         // 装備 { キャラID: [アイテムID, ...]（最大 ITEM_CONFIG.slotsPerChar 個） }
     pendingRewards: [], // まだ選んでいない報酬 [[アイテムID × 5], ...]
-    discovered: [],     // 一度でも手に入れたアイテム（合成図鑑で表示する）
+    discovered: [],     // 一度でも手に入れたアイテム（合成図鑑・📖図鑑で表示する）
+    bestiary: {},       // 倒した敵の記録 { 敵ID: { kills: 倒した数, firstFloor: 初めて倒した階 } }（📖図鑑）
     cycle: 1,           // 何周目か（最終ボスを倒すと次の周へ進める）
     endingShown: false, // この周でエンディングを見たか
     tutorialSeen: false, // 遊び方の説明を見たか（初回だけ自動で表示）
@@ -150,6 +152,18 @@ function applySaveData(saved) {
   for (const id in gameState.equips) gameState.equips[id].forEach(markDiscovered);
   // ランキング用の最高到達階（周回してもリセットしない）
   gameState.bestFloor = Math.max(gameState.bestFloor || 1, gameState.maxFloor || 1);
+}
+
+// 📖図鑑：敵を倒したことを記録する。初めて倒したなら true を返す
+function recordDefeat(enemyId, floor) {
+  if (!ENEMIES[enemyId]) return false;
+  const rec = gameState.bestiary[enemyId];
+  if (rec) {
+    rec.kills++;
+    return false;
+  }
+  gameState.bestiary[enemyId] = { kills: 1, firstFloor: floor };
+  return true;
 }
 
 // 図鑑に「入手済み」として記録する

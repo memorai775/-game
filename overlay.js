@@ -264,7 +264,18 @@ function openSettings() {
       <input type="checkbox" id="set-show-stats" ${s.showStats ? 'checked' : ''}>
       <span><b>ステータスを常に表示</b><br>
       <small>OFF：キャラは名前・HPバー・行動順だけ（タップで詳細）。ON：攻撃・防御・速さ・バフなどもカードに表示</small></span>
+    </label>
+    <label class="setting-row">
+      <input type="checkbox" id="set-lite" ${isLiteMode() ? 'checked' : ''}>
+      <span><b>軽量モード</b><br>
+      <small>光る・点滅するなどの重い見た目の効果を減らします。スマホで絵が止まる・カクつくときは ON にしてください（スマホでは最初から ON）</small></span>
     </label>`);
+  document.getElementById('set-lite').addEventListener('change', e => {
+    gameState.settings.lite = e.target.checked;
+    saveGame();
+    UI.renderControls();
+    Cloud.save('settings');
+  });
   document.getElementById('set-show-stats').addEventListener('change', e => {
     gameState.settings.showStats = e.target.checked;
     saveGame();
