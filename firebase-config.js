@@ -8,10 +8,11 @@
 // ※ 設定していない間は、クラウド機能なし（ブラウザ内保存だけ）で遊べます。
 // =====================================================================
 const FIREBASE_CONFIG = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyCATmkrQ6_38IbilrugqNNgXe_6fxpWcPE',
+  authDomain: 'yurugame-123dc.firebaseapp.com',
+  projectId: 'yurugame-123dc',
+  storageBucket: 'yurugame-123dc.firebasestorage.app',
+  messagingSenderId: '650334385973',
+  appId: '1:650334385973:web:4d1bd670f2e49268d9be7c',
+  measurementId: 'G-3GHLR1NG4Z',
 };

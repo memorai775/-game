@@ -549,9 +549,14 @@ function scaledDelay(ms) {
   return ms / gameState.settings.speed;
 }
 
-// 指定ミリ秒（×1 のとき）待つ。戦闘速度に合わせて短くなる
+// 指定ミリ秒（×1 のとき）待つ。戦闘速度に合わせて短くなる。一時停止中は再開まで待つ
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, scaledDelay(ms)));
+  return new Promise(resolve => setTimeout(resolve, scaledDelay(ms))).then(whenRunning);
+}
+
+// 指定ミリ秒（×1 のとき）あとに fn を実行する。一時停止中は再開してから実行（ゲームの進行はすべてこれを使う）
+function later(fn, ms) {
+  setTimeout(() => whenRunning().then(fn), scaledDelay(ms));
 }
 
 // ---------------------------------------------------------------------
@@ -881,7 +886,7 @@ class Battle {
     if (!actor.alive) {
       this.current = null;
       UI.render(this);
-      setTimeout(() => { if (battle === this) this.next(); }, scaledDelay(BATTLE_CONFIG.turnInterval));
+      later(() => { if (battle === this) this.next(); }, BATTLE_CONFIG.turnInterval);
       return;
     }
     // 擬態中のミミックは何もしない
@@ -927,10 +932,10 @@ class Battle {
         UI.showWaiting(actor);
         this.log(`${actor.name}は魅了されて、仲間に襲いかかった！`, 'system');
         const victim = victims[Math.floor(Math.random() * victims.length)];
-        setTimeout(() => {
+        later(() => {
           if (battle !== this || this.over) return;
           this.useSkill(actor, 'attack', [victim]);
-        }, scaledDelay(BATTLE_CONFIG.enemyDelay));
+        }, BATTLE_CONFIG.enemyDelay);
         return;
       }
     }
@@ -939,7 +944,7 @@ class Battle {
       return;
     }
     UI.showWaiting(actor);
-    setTimeout(() => {
+    later(() => {
       if (battle !== this || this.over) return; // 別の戦闘が始まっていたら中断
       if (actor.side === 'enemy') {
         this.enemyAct(actor);
@@ -948,7 +953,7 @@ class Battle {
       } else {
         this.waitInput(actor); // 待っている間にオートが切られた
       }
-    }, scaledDelay(BATTLE_CONFIG.enemyDelay));
+    }, BATTLE_CONFIG.enemyDelay);
   }
 
   // 行動開始時のアイテム効果（祈りのお守り・聖なる指輪）
@@ -1309,10 +1314,10 @@ class Battle {
     this.refreshIntents();
 
     UI.render(this);
-    setTimeout(() => {
+    later(() => {
       if (battle !== this) return;
       this.next();
-    }, scaledDelay(BATTLE_CONFIG.turnInterval));
+    }, BATTLE_CONFIG.turnInterval);
   }
 
   // 勝敗判定
@@ -1878,6 +1883,7 @@ function closeEnding(choice) {
   // 'endless' のときはそのまま（すでに次の階＝無限モードに進んでいる）
   UI.renderHeader();
   startFloor();
+  Cloud.save('cycle');
 }
 
 document.getElementById('ending-next').addEventListener('click', () => closeEnding('cycle'));
@@ -1941,7 +1947,7 @@ function onBattleEnd(b, win) {
       UI.showResult(true, `${b.floor}階クリア！`, detail);
       UI.renderHeader();
       Panel.refresh();
-      setTimeout(() => { if (battle === b) showEnding(); }, scaledDelay(DUNGEON.floorInterval));
+      later(() => { if (battle === b) showEnding(); }, DUNGEON.floorInterval);
       return; // エンディングで選ぶまで次の階へは進まない
     }
     UI.showResult(true, `${b.floor}階クリア！`, `${detail}<br>${gameState.floor}階へ進みます…`);
@@ -1955,14 +1961,18 @@ function onBattleEnd(b, win) {
   Panel.refresh(); // ポイントや報酬が増えたので、開いているパネルを更新
 
   // 少し待って次の戦闘へ
-  setTimeout(() => {
+  later(() => {
     if (battle === b) startFloor();
-  }, scaledDelay(DUNGEON.floorInterval));
+  }, DUNGEON.floorInterval);
 }
 
 // データを初期化して1階からやり直す
 function restartFromScratch() {
+  const nickname = gameState.nickname; // ランキングの名前は残す（ランキングの記録も消えない）
   resetGame();
+  gameState.nickname = nickname;
+  saveGame();
+  Cloud.save('reset');
   allyHp = {};
   UI.renderControls();
   battle = null; // 進行中の戦闘の予約処理を止める（battle !== this で中断される）
@@ -1978,13 +1988,13 @@ const HOWTO_HTML = `
     <h3>⚔ 遊び方</h3>
     <ol>
       <li><b>ダンジョンを1階ずつ進もう。</b>敵を全滅させると次の階へ。10階ごとにボスがいて、全滅すると最後に倒したボスの階に戻ります。</li>
-      <li><b>速いキャラほどたくさん行動。</b>行動順リスト（スマホは上部、PCは右側）で、これからの順番と敵の大技の予告「⚠」が見られます。</li>
+      <li><b>速いキャラほどたくさん行動。</b>右側の行動順リストで、これからの順番と敵の大技の予告「⚠」が見られます。</li>
       <li><b>味方の番に技を選ぼう。</b>「オート」をONにすると味方も自動で戦います。×2・×4で戦闘が速くなります。</li>
       <li><b>「強化」タブ</b>：レベルアップでもらえるポイントで、ステータスや出撃枠を増やせます。戦闘中でも操作できます。</li>
       <li><b>「アイテム」タブ</b>：5階ごとにアイテムを1つ選べます。下級アイテム2つを合成すると上級アイテムに。</li>
       <li><b>閉じている間も成長。</b>次に開いたとき、離れていた時間に応じて経験値がもらえます（最大8時間）。進行は自動で保存されます。</li>
     </ol>
-    <p class="popup-note">アイコンにマウスを乗せる（スマホはタップする）と説明が出ます。<br>この説明は右上の「？ 遊び方」でいつでも見られます。</p>
+    <p class="popup-note">アイコンにマウスを乗せる（スマホはタップする）と説明が出ます。<br>この説明は右上の「？」でいつでも見られます。<br>「☁ アカウント」からGoogleアカウントと連携すると、別の端末でも続きから遊べます。</p>
   </div>`;
 
 // 特殊能力・状態異常・アイテムのアイコンをタップしたとき、説明を下に出す（スマホ向け）
@@ -2034,3 +2044,7 @@ if (offline) {
 }
 
 UI.announceRecruits(recruitsOnLoad);
+
+// クラウド（Firebase）に接続：ログイン → クラウドのセーブの方が新しければそこから再開
+// （Firebase 未設定・ファイルを直接開いたときは、ブラウザ内保存だけで遊べる）
+Cloud.init();
