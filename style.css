@@ -1202,3 +1202,102 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 #stage.portrait .modal-box { width: 500px; }
 #stage.portrait .popup-box:has(.howto) { max-width: 500px; }
 #stage.portrait #bag-btn { width: 46px; height: 40px; font-size: 22px; }
+/* =====================================================================
+   📖 図鑑
+   ===================================================================== */
+.zk-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+.zk-tabs button { flex: 1; padding: 6px 4px; font-size: 13px; }
+.zk-progress { height: 5px; border-radius: 3px; background: #151823; overflow: hidden; margin-bottom: 8px; }
+.zk-progress > div { height: 100%; background: linear-gradient(90deg, #ffd54a, #ff9a3a); }
+.zk-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.zk-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px 4px;
+  border-radius: 8px;
+  background: #20253a;
+  border: 1px solid #343b52;
+}
+.zk-cell:hover:not(:disabled) { background: #2c3350; }
+.zk-cell.boss { border-color: #c8901a; }
+.zk-img { width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; }
+.zk-img img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 0 1px #fff); }
+.zk-name { font-size: 10px; line-height: 1.25; width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zk-cell.unknown .zk-img img { filter: brightness(0) opacity(0.5); }   /* 未登録：シルエット */
+.zk-cell.unknown .zk-name { color: #7a84a8; letter-spacing: 0.1em; }
+.zk-tag {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #c8901a;
+  color: #2a1a00;
+  font-size: 9px;
+  font-weight: bold;
+}
+.zk-cell .zk-tag { position: absolute; top: 3px; right: 3px; }
+
+.zk-back { margin-bottom: 8px; padding: 4px 12px; font-size: 12px; }
+.zk-detail { text-align: center; }
+.zk-big { display: flex; justify-content: center; margin-bottom: 4px; }
+.zk-big img { width: 110px; height: 110px; object-fit: contain; filter: drop-shadow(0 0 2px #fff); }
+.zk-detail.unknown .zk-big img { filter: brightness(0) opacity(0.5); }
+.zk-big .item-icon.lg { width: 80px; height: 80px; }
+.zk-dname { font-size: 17px; font-weight: bold; }
+.zk-sub { font-size: 11px; color: #9aa3c0; margin-bottom: 6px; }
+.zk-desc { margin: 4px 0 8px; }
+.zk-hint { color: #ffd54a; margin: 6px 0; }
+.zk-stats { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 12px; }
+.zk-stats th { color: #9aa3c0; font-weight: normal; text-align: left; padding: 2px 4px; }
+.zk-stats td { font-weight: bold; text-align: left; padding: 2px 4px; }
+.zk-detail .detail-list, .zk-detail .detail-sec { text-align: left; }
+.zk-recipe { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 6px 0; }
+.zk-used { font-size: 12px; text-align: left; margin: 2px 0 0; }
+#stage.portrait .zk-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); max-height: 560px; }
+#stage.portrait .modal-box { max-height: 860px; }
+/* =====================================================================
+   縦画面：バトル部分は中身の高さだけにして、残りを下のパネルに回す
+   （上から：ヘッダー → バトル（敵・味方・コマンド）→ タブ＋パネル）
+   ===================================================================== */
+#stage.portrait .battle-main { flex: 0 0 auto; gap: 4px; padding: 4px 6px 6px; }
+#stage.portrait .field { flex: 0 0 auto; }
+#stage.portrait .unit-row { align-content: flex-start; align-items: flex-start; }
+#stage.portrait .unit { padding: 4px 5px 3px; }
+#stage.portrait:not(.show-stats) .unit .portrait,
+#stage.portrait:not(.show-stats) .portrait-fallback { width: 58px; height: 58px; }
+#stage.portrait:not(.show-stats) .sprite-box { min-height: 58px; margin-bottom: 0; }
+#stage.portrait .unit.small .portrait { width: 40px; height: 40px; }
+#stage.portrait .unit .name { font-size: 12px; }
+#stage.portrait .turn-badge { font-size: 11px; min-height: 14px; margin-top: 1px; }
+#stage.portrait .hpbar { margin: 2px 0 0; }
+#stage.portrait .controls button { padding: 4px 10px; }
+#stage.portrait #command-area { padding: 5px 8px; }
+#stage.portrait #command-buttons button { padding: 8px 4px; font-size: 13px; }
+
+/* パネルは残りの高さを全部使う（どのタブでも） */
+#stage.portrait #side-panel,
+#stage.portrait #side-panel[data-tab="upgrade"],
+#stage.portrait #side-panel[data-tab="items"],
+#stage.portrait #side-panel[data-tab="log"] { flex: 1 1 auto; min-height: 0; height: auto; }
+
+/* 行動順は縦のリスト（場所があるので名前まで読める） */
+#stage.portrait #order-list { flex-direction: column; overflow: visible; padding-bottom: 0; gap: 4px; }
+#stage.portrait .order-row { flex: 0 0 auto; max-width: none; padding: 3px 8px; font-size: 13px; }
+#stage.portrait .order-row .face { width: 30px; height: 30px; }
+#stage.portrait .order-row.now { padding: 5px 10px; font-size: 14px; }
+#stage.portrait .order-row.now .face { width: 38px; height: 38px; }
+#stage.portrait #order-list.previewing::before { display: block; }
+/* 縦画面のヘッダー：ボタンはアイコンだけにして1段に収める */
+#stage.portrait .header-right .lbl { display: none; }
+#stage.portrait .header-right { flex-wrap: nowrap; gap: 4px; }
+#stage.portrait .header-right button { padding: 5px 9px; font-size: 15px; }
+#stage.portrait #cloud-status { max-width: 260px; }

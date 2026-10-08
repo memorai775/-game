@@ -48,8 +48,9 @@
         <!-- 未選択のアイテム報酬があるときだけ出る（押すとアイテムタブを開く） -->
         <button id="reward-badge" class="hidden"></button>
         <span id="cloud-status"></span>
-        <button id="ranking-btn" type="button">🏆 ランキング</button>
-        <button id="account-btn" type="button">☁ アカウント</button>
+        <button id="zukan-btn" type="button" title="図鑑">📖<span class="lbl"> 図鑑</span></button>
+        <button id="ranking-btn" type="button" title="ランキング">🏆<span class="lbl"> ランキング</span></button>
+        <button id="account-btn" type="button" title="アカウント">☁<span class="lbl"> アカウント</span></button>
         <button id="settings-btn" type="button" title="設定">⚙</button>
         <button id="help-btn" type="button">？</button>
       </div>
@@ -169,6 +170,7 @@
   <script src="firebase-config.js"></script>
   <script src="cloud.js"></script>
   <script src="overlay.js"></script>
+  <script src="zukan.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
