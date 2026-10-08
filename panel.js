@@ -6,7 +6,7 @@
 'use strict';
 
 const Panel = {
-  tab: 'order', // 'order'（行動順） / 'upgrade'（強化） / 'items'（アイテム）
+  tab: 'order', // 'order'（行動順） / 'upgrade'（強化） / 'items'（アイテム） / 'log'（ログ）
 
   init() {
     for (const btn of document.querySelectorAll('#panel-tabs button')) {
@@ -27,6 +27,8 @@ const Panel = {
     document.getElementById('order-list').classList.toggle('hidden', name !== 'order');
     document.getElementById('upgrade-root').classList.toggle('hidden', name !== 'upgrade');
     document.getElementById('item-root').classList.toggle('hidden', name !== 'items');
+    document.getElementById('log-root').classList.toggle('hidden', name !== 'log');
+    if (name === 'log') { const log = document.getElementById('log'); log.scrollTop = log.scrollHeight; }
     this.refresh();
   },
 
@@ -54,6 +56,7 @@ function afterProgressChange() {
   syncBattleAllies(); // 戦闘中の味方にもすぐ反映
   UI.renderHeader();
   Panel.refresh();
+  Cloud.save('upgrade'); // 育成（強化・装備・合成など）したらクラウドへ保存
 }
 
 // 押したら処理して、変更を反映するボタン

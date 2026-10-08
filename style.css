@@ -285,33 +285,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .unit.focus { box-shadow: 0 0 0 2px #ffd54a, 0 0 16px #ffd54a; }
 
 /* 狭い画面：行動順タブは上部に横並び、強化・アイテムタブは下部のパネルに */
-/* 狭い画面（スマホなど）：パネルは常に上部（タブがいつでも押せる）。
-   行動順は横並び、強化・アイテムは高さを決めて中だけスクロール（下のバトルも見える） */
-@media (max-width: 720px) {
-  .battle-layout { flex-direction: column; gap: 8px; }
-  #side-panel {
-    order: -1;
-    position: static;
-    flex: none;
-    width: 100%;
-    max-height: none;
-    overflow: visible;
-  }
-  #upgrade-root, #item-root {
-    max-height: 55vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-right: 2px;
-  }
-  #order-list {
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 4px;
-  }
-  #order-list.previewing::before { display: none; }
-  .order-row { flex: 0 0 auto; max-width: 150px; }
-}
-
 /* ---- ユニット表示 ---- */
 .unit-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .unit {
@@ -811,116 +784,266 @@ button.danger { border-color: #a05050; color: #ffb0b0; }
 #log .info   { color: #9ac0ff; }
 #log .system { color: #ffffff; font-weight: bold; }
 
+
 /* =====================================================================
-   スマホ対応・タップしやすさ・遊び方
+   横画面（16:9）のステージ
+   ゲームは 960×540 の #stage に描き、screen.js が画面に合わせて拡大縮小する。
+   サイズはすべてこの 960×540 の中での大きさ（実際の画面ではそれを拡大・縮小して表示）
    ===================================================================== */
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body { background: #0b0d14; }
+
+#stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 960px;
+  height: 540px;
+  transform-origin: 0 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #1e2230;
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#stage input { -webkit-user-select: text; user-select: text; }
+
+/* 一時停止中（縦向きなど）はアニメーションも止める */
+#stage.paused *, #stage.paused *::before, #stage.paused *::after { animation-play-state: paused !important; }
 
 /* ボタン類：ダブルタップでの拡大を防ぎ、すぐ反応させる */
 button, select, input, .trait-icon, .sbadge, .item-icon, .kiwami { touch-action: manipulation; }
 
-/* 指で操作する端末：ボタンを押しやすい大きさに（目安 44px） */
-@media (pointer: coarse) {
-  button, select { min-height: 44px; }
-  #panel-tabs button { min-height: 44px; }
-  .stat-table button, .equip-slot button, .zukan-card button, .recipe-row button { min-height: 40px; min-width: 52px; }
-  .sortie-check input { width: 22px; height: 22px; vertical-align: middle; }
-  .zukan-head input { width: 20px; height: 20px; vertical-align: middle; }
-  .trait-icon, .sbadge { padding: 2px 6px; }
+/* ---- ヘッダー（1行） ---- */
+#stage header {
+  flex: 0 0 auto;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+}
+.header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+#stage header h1 { margin: 0; font-size: 15px; white-space: nowrap; }
+.header-status { min-width: 0; line-height: 1.3; }
+#stage #floor-status  { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#stage #global-status { font-size: 11px; margin: 0; white-space: nowrap; }
+.header-right { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+.header-right button { padding: 4px 9px; font-size: 12px; }
+#stage #reward-badge { margin: 0; }
+#cloud-status { font-size: 10px; color: #9aa3c0; max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- 本体 ---- */
+#stage main { flex: 1 1 auto; min-height: 0; max-width: none; margin: 0; padding: 6px 8px 8px; }
+#battle-screen { height: 100%; }
+#stage .battle-layout { height: 100%; gap: 8px; align-items: stretch; flex-direction: row; }
+
+#stage .battle-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px 6px;
+  overflow: hidden;
+}
+#stage .controls { flex: 0 0 auto; margin: 0; gap: 6px; }
+#stage .controls button { padding: 3px 10px; font-size: 12px; }
+#stage .controls > span:first-of-type { color: var(--area-text); font-size: 12px; } /* 「速度：」をエリアの背景でも読めるように */
+
+/* 敵・味方の列：それぞれ残りの高さを半分ずつ */
+#stage .field { flex: 1 1 0; min-height: 0; display: flex; }
+#stage .field > h2 { display: none; }
+#stage .unit-row { flex: 1; flex-wrap: nowrap; gap: 6px; justify-content: center; align-items: stretch; }
+#stage .unit {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 150px;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+}
+#stage .unit .portrait, #stage .portrait-fallback { width: 70px; height: 70px; }
+#stage .portrait-fallback { font-size: 1.8rem; }
+#stage .unit.small .portrait { width: 48px; height: 48px; }
+#stage .sprite-box, #stage .unit.small .sprite-box { min-height: 70px; margin-bottom: 2px; }
+#stage .unit .name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#stage .traits { margin-left: 2px; }
+#stage .trait-icon { font-size: 10px; padding: 0 2px; }
+#stage .unit .sub { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#stage .hpbar { height: 6px; margin: 2px 0 1px; }
+#stage .unit .hp-text { font-size: 11px; }
+#stage .unit .stats { font-size: 9.5px; margin-top: 1px; line-height: 1.3; }
+#stage .unit .status { font-size: 9.5px; min-height: 0; margin-top: 1px; line-height: 1.3; }
+#stage .sbadge { font-size: 10px; }
+#stage .num { font-size: 1.2rem; }
+#stage .num.crit { font-size: 1.5rem; }
+#stage .unit.ally  .actor.step { transform: translateY(-26px); }
+#stage .unit.enemy .actor.step { transform: translateY(26px); }
+#stage .speech { max-width: 200px; font-size: 11px; }
+
+/* コマンド */
+#stage #command-area { flex: 0 0 auto; min-height: 0; margin: 0; padding: 5px 8px; }
+#stage #command-title { font-size: 12px; margin-bottom: 4px; min-height: 16px; }
+#stage #command-buttons { gap: 5px; }
+#stage #command-buttons button { padding: 5px 12px; font-size: 13px; }
+#stage #skill-desc { font-size: 11px; min-height: 15px; margin-top: 3px; }
+
+/* 勝敗メッセージはバトルの上に重ねる */
+#stage #result {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  min-width: 340px;
+  margin: 0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
 }
 
-/* 説明の吹き出し（タップでも特殊能力・状態異常・アイテムの説明が読めるように） */
+#stage .area-banner { top: 38%; }
+
+/* ---- 右パネル ---- */
+#stage #side-panel {
+  flex: 0 0 250px;
+  position: static;
+  height: 100%;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#stage #side-panel[data-tab="upgrade"],
+#stage #side-panel[data-tab="items"] { flex-basis: 310px; }
+#stage #panel-tabs { flex: 0 0 auto; margin-bottom: 6px; gap: 3px; }
+#stage #panel-tabs button { padding: 4px 2px; font-size: 12px; }
+#panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+#stage #order-list { flex-direction: column; overflow: visible; }
+#log-root { height: 100%; }
+#stage #log { height: 100%; font-size: 11px; }
+
+/* ---- お知らせ（タップした説明・保存のお知らせなど） ---- */
 #toast {
-  position: fixed;
+  position: absolute;
   left: 50%;
-  bottom: 16px;
+  bottom: 14px;
   transform: translateX(-50%);
-  z-index: 40;
-  max-width: calc(100% - 32px);
-  padding: 10px 14px;
+  z-index: 60;
+  max-width: 80%;
+  padding: 8px 14px;
   border-radius: 10px;
   background: rgba(15, 18, 28, 0.95);
   border: 1px solid #7a84a8;
   color: #e8e8f0;
-  font-size: 0.9rem;
+  font-size: 12px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s;
 }
 #toast.show { opacity: 1; }
 
-/* ヘッダーの「遊び方」ボタン */
-.header-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-#help-btn { padding: 4px 12px; font-size: 0.85rem; border-color: #8ad0ff; color: #8ad0ff; }
-
-/* 遊び方（最初に表示） */
+/* ---- 遊び方 ---- */
 .howto { text-align: left; }
-.howto h3 { margin: 0 0 8px; text-align: center; color: #ffd54a; }
-.howto ol { margin: 0 0 12px; padding-left: 1.4em; }
-.howto li { margin-bottom: 8px; line-height: 1.6; font-size: 0.9rem; }
+.howto h3 { margin: 0 0 6px; text-align: center; color: #ffd54a; }
+.howto ol { margin: 0 0 8px; padding-left: 1.4em; }
+.howto li { margin-bottom: 5px; line-height: 1.5; font-size: 12px; }
 .howto b { color: #ffd54a; }
-.popup-box { max-height: calc(100vh - 32px); overflow-y: auto; }
-.popup-box:has(.howto) { max-width: 440px; }
-#popup-ok { min-width: 120px; }
+#stage .popup-box { max-height: 500px; overflow-y: auto; }
+#stage .popup-box:has(.howto) { max-width: 560px; }
+#stage #popup, #stage #ending { position: absolute; }
 
-/* ---- 幅 600px 以下（スマホ縦画面 375px 前後を想定） ---- */
-@media (max-width: 600px) {
-  header { padding: 8px 12px; }
-  header h1 { font-size: 1rem; }
-  #floor-status { font-size: 0.85rem; }
-  #global-status { font-size: 0.8rem; margin-bottom: 4px; }
-  main { padding: 8px 8px 32px; }
-  h2 { margin: 6px 0 4px; font-size: 0.85rem; }
+/* ---- ウィンドウ（アカウント・ランキング・ニックネーム） ---- */
+#modal {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+#modal.hidden { display: none; }
+.modal-box {
+  width: 460px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: #2a3044;
+  border: 1px solid #4a5270;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #4a5270;
+  font-weight: bold;
+  color: #ffd54a;
+}
+#modal-close { padding: 2px 10px; }
+#modal-body { padding: 10px 14px 14px; overflow-y: auto; }
+#modal-body p { margin: 0 0 8px; }
+.modal-note { font-size: 11px; color: #9aa3c0; }
+.modal-error { font-size: 12px; color: #ff9a8a; min-height: 1em; }
+.modal-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+button.primary { border-color: #ffd54a; color: #ffd54a; }
+#nickname-input {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid #7a84a8;
+  background: #151823;
+  color: #e8e8f0;
+}
+.account-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 12px; }
+.account-table th { text-align: left; width: 7em; color: #9aa3c0; font-weight: normal; padding: 3px 0; }
+.account-table td { padding: 3px 0; }
 
-  .controls { gap: 6px; }
-  .controls > span:first-of-type { display: none; } /* 「速度：」の文字は省略 */
-  #auto-btn { flex: 1; }
-  #speed-buttons button { padding: 6px 10px; }
+/* ランキング */
+.my-rank { margin-bottom: 8px; font-size: 13px; }
+.my-rank strong { color: #ffd54a; font-size: 16px; }
+.my-rank button { margin-left: 6px; padding: 2px 10px; font-size: 12px; }
+.rank-scroll { max-height: 320px; overflow-y: auto; border-radius: 6px; border: 1px solid #343b52; }
+.rank-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rank-table th { position: sticky; top: 0; background: #20253a; color: #9aa3c0; font-weight: normal; padding: 4px 6px; text-align: left; }
+.rank-table td { padding: 4px 6px; border-top: 1px solid #343b52; }
+.rank-table .rank  { width: 3em; text-align: right; color: #9aa3c0; }
+.rank-table .rfloor { width: 5em; text-align: right; font-weight: bold; }
+.rank-table .rname { word-break: break-all; }
+.rank-table tr.top1 .rank { color: #ffd54a; font-weight: bold; }
+.rank-table tr.top2 .rank { color: #d8dce8; font-weight: bold; }
+.rank-table tr.top3 .rank { color: #e0a060; font-weight: bold; }
+.rank-table tr.mine td { background: rgba(255, 213, 74, 0.15); }
 
-  .battle-main { padding: 2px 6px 8px; border-radius: 10px; }
-
-  /* キャラのカード：3体が横に並ぶ大きさ */
-  .unit-row { gap: 6px; }
-  /* 1行に3枚。4体目以降も同じ大きさで次の行へ（引き伸ばさない） */
-  .unit { flex: 0 0 calc((100% - 12px) / 3); min-width: 0; max-width: none; padding: 6px; }
-  .unit .portrait, .portrait-fallback { width: 64px; height: 64px; }
-  .portrait-fallback { font-size: 1.6rem; }
-  .unit.small .portrait { width: 44px; height: 44px; }
-  .unit .sprite-box, .unit.small .sprite-box { min-height: 64px; margin-bottom: 2px; }
-  .unit .name { font-size: 0.8rem; line-height: 1.3; word-break: break-all; }
-  .unit .sub { font-size: 0.65rem; }
-  .unit .hp-text { font-size: 0.75rem; }
-  .unit .stats { font-size: 0.65rem; }
-  .unit .status { font-size: 0.65rem; min-height: 0; }
-  .traits { display: block; margin-left: 0; }
-  .trait-icon { font-size: 0.7rem; }
-  .sbadge { font-size: 0.65rem; }
-  .num { font-size: 1.1rem; }
-  .num.crit { font-size: 1.4rem; }
-  .unit.ally  .actor.step { transform: translateY(-20px); } /* 踏み込みは控えめに */
-  .unit.enemy .actor.step { transform: translateY(20px); }
-  .speech { max-width: 180px; font-size: 0.75rem; }
-  .area-banner { top: 40px; padding: 10px 18px; }
-  .area-banner .area-name { font-size: 1.3rem; }
-
-  /* コマンド：2列で大きく */
-  #command-area { padding: 8px; min-height: 0; }
-  #command-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-  #command-buttons button { min-height: 48px; font-size: 0.95rem; padding: 6px 4px; }
-  #skill-desc { font-size: 0.75rem; }
-
-  #result { font-size: 1rem; padding: 10px; }
-  #log { height: 140px; font-size: 0.75rem; }
-
-  /* 行動順（上部の横並び）を小さめに。横にだけスクロール */
-  #order-list { overflow-y: hidden; scrollbar-width: thin; padding-top: 2px; }
-  .order-row { max-width: 120px; padding: 3px 6px; gap: 5px; font-size: 0.75rem; }
-  .order-row .face { width: 28px; height: 28px; }
-  .order-row.now { padding: 5px 8px; font-size: 0.8rem; }
-  .order-row.now .face { width: 34px; height: 34px; }
-
-  /* 強化・アイテム */
-  .zukan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .stat-table { font-size: 0.85rem; }
-  .ending-buttons button { min-width: 0; width: 100%; }
-  .ending-text { font-size: 0.9rem; }
+/* ---- 縦向きのときのお願い（ステージの外・画面いっぱい） ---- */
+#rotate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0b0d14;
+  color: #e8e8f0;
+  text-align: center;
+}
+#rotate-overlay.hidden { display: none; }
+.rotate-icon { font-size: 56px; margin-bottom: 8px; animation: rotate-hint 2s ease-in-out infinite; }
+.rotate-box p { margin: 0 0 8px; font-size: 20px; font-weight: bold; }
+.rotate-box .rotate-note { font-size: 14px; font-weight: normal; color: #9aa3c0; }
+#fullscreen-btn { margin-top: 12px; padding: 12px 24px; font-size: 16px; border-color: #ffd54a; color: #ffd54a; }
+@keyframes rotate-hint {
+  0%, 20%   { transform: rotate(0deg); }
+  50%, 80%  { transform: rotate(-90deg); }
+  100%      { transform: rotate(0deg); }
 }

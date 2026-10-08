@@ -32,6 +32,8 @@ function newGameState() {
     cycle: 1,           // 何周目か（最終ボスを倒すと次の周へ進める）
     endingShown: false, // この周でエンディングを見たか
     tutorialSeen: false, // 遊び方の説明を見たか（初回だけ自動で表示）
+    bestFloor: 1,       // これまでの最高到達階（周回しても減らない。ランキングに使う）
+    nickname: '',       // ランキングに出す名前
   };
 }
 
@@ -111,15 +113,23 @@ setInterval(saveGame, 30000);
 window.addEventListener('beforeunload', saveGame);
 
 function loadGame() {
+  let saved = null;
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) {
-      const saved = JSON.parse(raw);
-      gameState = Object.assign(newGameState(), saved);
-      gameState.settings = Object.assign(newGameState().settings, saved.settings);
-    }
+    if (raw) saved = JSON.parse(raw);
   } catch (e) {
-    gameState = newGameState();
+    saved = null;
+  }
+  applySaveData(saved);
+}
+
+// セーブデータ（ブラウザ・クラウドのどちらから読んだものでも）を gameState にする
+// 足りない項目は初期値で補い、data.js / items.js から消えたキャラやアイテムは取り除く
+function applySaveData(saved) {
+  gameState = newGameState();
+  if (saved && typeof saved === 'object') {
+    gameState = Object.assign(newGameState(), saved);
+    gameState.settings = Object.assign(newGameState().settings, saved.settings);
   }
   // data.js から消えたキャラは除外し、最初から仲間のキャラ（join なし）は加える
   // ※ 条件を満たした仲間の加入は、ポップアップを出すため main.js 側で checkRecruits() を呼ぶ
@@ -138,6 +148,8 @@ function loadGame() {
   // 図鑑：今持っている・装備しているアイテムは「入手済み」にする（古いセーブデータ向け）
   gameState.inventory.forEach(markDiscovered);
   for (const id in gameState.equips) gameState.equips[id].forEach(markDiscovered);
+  // ランキング用の最高到達階（周回してもリセットしない）
+  gameState.bestFloor = Math.max(gameState.bestFloor || 1, gameState.maxFloor || 1);
 }
 
 // 図鑑に「入手済み」として記録する
