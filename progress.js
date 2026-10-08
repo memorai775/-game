@@ -23,7 +23,7 @@ function newGameState() {
     floor: 1,         // 現在の階
     maxFloor: 1,      // 最高到達階
     checkpoint: 1,    // 全滅時に戻る階
-    settings: { auto: false, speed: 1 }, // オートバトルと戦闘速度
+    settings: { auto: false, speed: 1, showStats: false }, // オートバトル・戦闘速度・ステータスを常に表示
     lastSaved: null,  // 最後に保存した時刻（放置経験値の計算に使う）
     inventory: [],      // 所持品（装備していないアイテムのID。同じものは複数並ぶ）
     equips: {},         // 装備 { キャラID: [アイテムID, ...]（最大 ITEM_CONFIG.slotsPerChar 個） }
@@ -358,6 +358,34 @@ function claimReward(index) {
   markDiscovered(set[index]);
   saveGame();
   return set[index];
+}
+
+// ---------------------------------------------------------------------
+// アイテム：経験値に変換（🎒ボタンから）
+// ---------------------------------------------------------------------
+// 1個あたりの経験値（今の全体レベルで次のレベルまでに必要な経験値 × 割合。レベルが上がっても価値が下がらない）
+function itemExpValue(itemId) {
+  const rate = ITEM_CONFIG.expRate[ITEMS[itemId].tier] || 0;
+  return Math.max(1, Math.round(expToNext(gameState.globalLevel) * rate));
+}
+
+// 変換する。picks = { アイテムID: 個数 }。所持品から減らして経験値を得る
+// 戻り値：{ count: 変換した個数, exp, levels, points }
+function convertItemsToExp(picks) {
+  let exp = 0;
+  let count = 0;
+  for (const id in picks) {
+    for (let i = 0; i < picks[id]; i++) {
+      const idx = gameState.inventory.indexOf(id);
+      if (idx === -1) break;
+      exp += itemExpValue(id); // 1個ずつ計算（途中でレベルが上がっても、選んだときの値と同じになるよう先に合計）
+      gameState.inventory.splice(idx, 1);
+      count++;
+    }
+  }
+  const gained = exp > 0 ? gainExp(exp) : { levels: 0, points: 0 };
+  saveGame();
+  return { count, exp, ...gained };
 }
 
 // ---------------------------------------------------------------------

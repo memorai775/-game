@@ -1,12 +1,14 @@
 // =====================================================================
-// screen.js  ―  画面まわり（横長16:9の拡大縮小・縦向き時の一時停止）
-// ゲームは 960×540 の「ステージ」に描き、画面の大きさに合わせて拡大縮小する。
+// screen.js  ―  画面まわり（ステージの拡大縮小・縦横の切り替え・一時停止）
+// ゲームは「ステージ」に描き、画面の大きさに合わせて拡大縮小する。
+//   横長の画面 … 960×540（16:9）のレイアウト
+//   縦長の画面 … 540×960（9:16）のレイアウト（スマホを縦に持ったとき）
 // main.js より先に読み込む（Game.pause / whenRunning を main.js が使う）
 // =====================================================================
 'use strict';
 
-const STAGE_W = 960;
-const STAGE_H = 540;
+const STAGE_LANDSCAPE = { w: 960, h: 540 };
+const STAGE_PORTRAIT  = { w: 540, h: 960 };
 
 // ---------------------------------------------------------------------
 // 一時停止（理由ごとに止める。全部の理由が解除されたら再開）
@@ -38,51 +40,38 @@ function whenRunning() {
 }
 
 // ---------------------------------------------------------------------
-// ステージを画面いっぱい（16:9のまま）に拡大縮小する
+// ステージを画面いっぱい（縦横比はそのまま）に拡大縮小する
+// 画面が縦長なら縦レイアウト、横長なら横レイアウトに切り替える
 // ---------------------------------------------------------------------
+let stageScale = 1;
+
+function isPortraitLayout() {
+  return document.getElementById('stage').classList.contains('portrait');
+}
+
 function fitStage() {
   const stage = document.getElementById('stage');
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const scale = Math.min(w / STAGE_W, h / STAGE_H);
-  stage.style.transform = `scale(${scale})`;
-  stage.style.left = `${(w - STAGE_W * scale) / 2}px`;
-  stage.style.top = `${(h - STAGE_H * scale) / 2}px`;
-}
-
-// ---------------------------------------------------------------------
-// スマホが縦向きのときは「横向きにしてください」を出して一時停止
-// （パソコンは縦長のウィンドウでも止めない。上下に余白が出るだけ）
-// ---------------------------------------------------------------------
-const isTouch = window.matchMedia('(pointer: coarse)');
-const isPortrait = window.matchMedia('(orientation: portrait)');
-
-function checkOrientation() {
-  const needRotate = isTouch.matches && isPortrait.matches;
-  document.getElementById('rotate-overlay').classList.toggle('hidden', !needRotate);
-  if (needRotate) Game.pause('orientation');
-  else Game.resume('orientation');
-}
-
-// 「全画面で遊ぶ」：全画面にして横向きに固定（Android の Chrome など。iPhone は非対応）
-async function enterFullscreenLandscape() {
-  try {
-    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-      await document.documentElement.requestFullscreen();
-    }
-    if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
-  } catch (e) {
-    // 対応していない端末では何もしない（手で横向きにしてもらう）
-  }
+  const portrait = h > w;
+  const size = portrait ? STAGE_PORTRAIT : STAGE_LANDSCAPE;
+  const changed = stage.classList.contains('portrait') !== portrait;
+  stage.classList.toggle('portrait', portrait);
+  stage.classList.toggle('landscape', !portrait);
+  stage.style.width = `${size.w}px`;
+  stage.style.height = `${size.h}px`;
+  stageScale = Math.min(w / size.w, h / size.h);
+  stage.style.transform = `scale(${stageScale})`;
+  stage.style.left = `${(w - size.w * stageScale) / 2}px`;
+  stage.style.top = `${(h - size.h * stageScale) / 2}px`;
+  // 縦横が切り替わったら、キャラの近くに出しているパネルは閉じる（位置がずれるため）
+  if (changed && typeof Overlay !== 'undefined') Overlay.closeAll();
 }
 
 function initScreen() {
   fitStage();
-  checkOrientation();
-  window.addEventListener('resize', () => { fitStage(); checkOrientation(); });
-  window.addEventListener('orientationchange', () => setTimeout(() => { fitStage(); checkOrientation(); }, 200));
-  isPortrait.addEventListener('change', checkOrientation);
-  document.getElementById('fullscreen-btn').addEventListener('click', enterFullscreenLandscape);
+  window.addEventListener('resize', fitStage);
+  window.addEventListener('orientationchange', () => setTimeout(fitStage, 200));
 }
 
 initScreen();

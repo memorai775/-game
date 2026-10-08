@@ -1024,26 +1024,181 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 .rank-table tr.top3 .rank { color: #e0a060; font-weight: bold; }
 .rank-table tr.mine td { background: rgba(255, 213, 74, 0.15); }
 
-/* ---- 縦向きのときのお願い（ステージの外・画面いっぱい） ---- */
-#rotate-overlay {
-  position: fixed;
+/* =====================================================================
+   折りたたみ表示・縦画面（9:16）・タップで開くパネル
+   ===================================================================== */
+
+/* ---- キャラのカード：ふだんは「名前・HPバー・行動順」だけ ----
+   設定「ステータスを常に表示」が ON（#stage.show-stats）なら全部出す */
+#stage .unit { cursor: pointer; }
+#stage .unit:hover { border-color: rgba(255, 255, 255, 0.25); }
+#stage:not(.show-stats) .unit .sub,
+#stage:not(.show-stats) .unit .hp-text,
+#stage:not(.show-stats) .unit .stats,
+#stage:not(.show-stats) .unit .status,
+#stage:not(.show-stats) .unit .traits { display: none; }
+#stage:not(.show-stats) .unit .portrait,
+#stage:not(.show-stats) .portrait-fallback { width: 80px; height: 80px; }
+#stage:not(.show-stats) .sprite-box { min-height: 80px; }
+#stage:not(.show-stats) .unit { justify-content: center; }
+
+/* 行動順（常に表示） */
+.turn-badge { font-size: 11px; color: #9aa3c0; margin-top: 2px; min-height: 15px; white-space: nowrap; }
+.turn-badge.soon { color: #8ad0ff; font-weight: bold; }
+.turn-badge.now  { color: #ffd54a; font-weight: bold; }
+
+/* ---- 🎒ボタン（バトル画面の右上の端） ---- */
+#bag-btn {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 12;
+  width: 40px;
+  height: 34px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 10px;
+  border-color: #ffd54a;
+  background: #2b3145;
+}
+
+/* ---- タップで開くパネル（キャラの詳細・🎒変換） ---- */
+#overlay-backdrop {
+  position: absolute;
   inset: 0;
-  z-index: 100;
+  z-index: 44;
+  background: rgba(0, 0, 0, 0.3); /* 外側をタップすると閉じる。開いている間は後ろを触れない */
+}
+#overlay-backdrop.hidden { display: none; }
+.float-panel {
+  position: absolute;
+  z-index: 45;
+  width: 270px;
+  max-height: 460px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: #262c40;
+  border: 1px solid #5a6488;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  animation: panel-pop 0.15s ease-out;
+}
+.float-panel.hidden { display: none; }
+#bag-panel { width: 380px; }
+@keyframes panel-pop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+/* 縦画面では画面の下から出す */
+.float-panel.sheet {
+  left: 0 !important;
+  right: 0 !important;
+  top: auto !important;
+  bottom: 0 !important;
+  width: auto !important; /* #bag-panel の幅指定より優先して横いっぱいに */
+  max-height: 58%;
+  border-radius: 14px 14px 0 0;
+  animation: sheet-up 0.18s ease-out;
+}
+@keyframes sheet-up { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.fp-head {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: #0b0d14;
-  color: #e8e8f0;
-  text-align: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #3a4260;
 }
-#rotate-overlay.hidden { display: none; }
-.rotate-icon { font-size: 56px; margin-bottom: 8px; animation: rotate-hint 2s ease-in-out infinite; }
-.rotate-box p { margin: 0 0 8px; font-size: 20px; font-weight: bold; }
-.rotate-box .rotate-note { font-size: 14px; font-weight: normal; color: #9aa3c0; }
-#fullscreen-btn { margin-top: 12px; padding: 12px 24px; font-size: 16px; border-color: #ffd54a; color: #ffd54a; }
-@keyframes rotate-hint {
-  0%, 20%   { transform: rotate(0deg); }
-  50%, 80%  { transform: rotate(-90deg); }
-  100%      { transform: rotate(0deg); }
+.fp-title { font-weight: bold; font-size: 14px; color: #ffd54a; min-width: 0; }
+.fp-title.ally  { color: #8ab8ff; }
+.fp-title.enemy { color: #ff9a8a; }
+.fp-title small { display: block; font-size: 11px; font-weight: normal; color: #9aa3c0; }
+.fp-close { flex: 0 0 auto; padding: 4px 12px; font-size: 14px; }
+.fp-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 10px 10px; font-size: 12px; }
+
+/* キャラの詳細 */
+.detail-hp { margin-bottom: 6px; }
+.detail-hp b { font-size: 15px; }
+.detail-hp .hpbar { margin-top: 3px; }
+.detail-stats { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+.detail-stats th { text-align: left; width: 5em; color: #9aa3c0; font-weight: normal; padding: 2px 0; }
+.detail-stats td { padding: 2px 0; font-weight: bold; }
+.detail-stats .up   { color: #6aff9a; font-size: 11px; }
+.detail-stats .down { color: #ff7a7a; font-size: 11px; }
+.detail-intent { margin: 4px 0 6px; padding: 4px 8px; border-radius: 6px; background: #5a2020; color: #ffd0d0; font-weight: bold; }
+.detail-sec { margin: 6px 0 3px; color: #9aa3c0; font-size: 11px; border-bottom: 1px solid #3a4260; }
+.detail-list { list-style: none; margin: 0; padding: 0; }
+.detail-list li { padding: 2px 0; line-height: 1.45; }
+.detail-list li.buff { color: #8ae0a0; }
+.detail-list li.debuff { color: #ffb0a0; }
+.detail-list li.none { color: #7a84a8; }
+.detail-list .item-icon { vertical-align: middle; }
+
+/* 🎒 変換パネル */
+.bag-note { margin: 0 0 6px; font-size: 11px; color: #9aa3c0; }
+.bag-empty { color: #7a84a8; text-align: center; padding: 12px 0; }
+.bag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  border-top: 1px solid #343b52;
+  cursor: pointer;
 }
+.bag-row.picked { background: rgba(255, 213, 74, 0.12); }
+.bag-name { flex: 1; min-width: 0; }
+.bag-name small { display: block; font-size: 10px; color: #9aa3c0; }
+.bag-step { display: flex; align-items: center; gap: 3px; }
+.bag-step span { min-width: 18px; text-align: center; font-weight: bold; }
+.bag-step button { padding: 2px 8px; font-size: 13px; }
+.bag-step .bag-all { font-size: 11px; padding: 3px 6px; }
+.bag-foot { flex: 0 0 auto; padding: 8px 10px 10px; border-top: 1px solid #3a4260; }
+.bag-total { margin-bottom: 6px; font-size: 13px; }
+.bag-total b { color: #ffd54a; font-size: 15px; }
+.bag-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.bag-buttons button { padding: 6px 12px; }
+
+/* ⚙ 設定 */
+.setting-row { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; cursor: pointer; }
+.setting-row input { width: 22px; height: 22px; margin-top: 2px; flex: 0 0 auto; }
+.setting-row small { color: #9aa3c0; }
+
+/* =====================================================================
+   縦画面（540×960）のレイアウト
+   上から：ヘッダー → 右パネル（行動順は横並び）→ バトル → コマンド
+   ===================================================================== */
+#stage.portrait { font-size: 14px; }
+#stage.portrait header { height: auto; flex-wrap: wrap; padding: 6px 10px; row-gap: 4px; }
+#stage.portrait .header-left { width: 100%; }
+#stage.portrait .header-right { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+#stage.portrait .header-right button { padding: 6px 10px; font-size: 13px; }
+#stage.portrait #cloud-status { margin-right: auto; max-width: 200px; }
+
+#stage.portrait .battle-layout { flex-direction: column; gap: 6px; }
+#stage.portrait #side-panel { flex: 0 0 auto; width: 100%; height: auto; }
+#stage.portrait #side-panel[data-tab="upgrade"],
+#stage.portrait #side-panel[data-tab="items"],
+#stage.portrait #side-panel[data-tab="log"] { flex: 0 0 330px; }
+#stage.portrait #panel-tabs button { padding: 7px 2px; font-size: 13px; }
+#stage.portrait #order-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+#stage.portrait .order-row { flex: 0 0 auto; max-width: 130px; padding: 3px 7px; gap: 5px; font-size: 12px; }
+#stage.portrait .order-row .face { width: 30px; height: 30px; }
+#stage.portrait .order-row.now { padding: 5px 9px; }
+#stage.portrait .order-row.now .face { width: 36px; height: 36px; }
+#stage.portrait #order-list.previewing::before { display: none; }
+
+#stage.portrait .battle-main { flex: 1 1 auto; min-height: 0; }
+#stage.portrait .unit-row { flex-wrap: wrap; align-content: center; gap: 6px; }
+#stage.portrait .unit { flex: 0 0 calc((100% - 12px) / 3); max-width: 170px; }
+#stage.portrait .unit .name { font-size: 13px; }
+#stage.portrait .turn-badge { font-size: 12px; }
+
+#stage.portrait #command-area { padding: 6px 8px; }
+#stage.portrait #command-title { font-size: 13px; }
+#stage.portrait #command-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+#stage.portrait #command-buttons button { padding: 10px 4px; font-size: 14px; }
+#stage.portrait #result { min-width: 0; width: 88%; }
+#stage.portrait .modal-box { width: 500px; }
+#stage.portrait .popup-box:has(.howto) { max-width: 500px; }
+#stage.portrait #bag-btn { width: 46px; height: 40px; font-size: 22px; }

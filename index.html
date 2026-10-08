@@ -50,6 +50,7 @@
         <span id="cloud-status"></span>
         <button id="ranking-btn" type="button">🏆 ランキング</button>
         <button id="account-btn" type="button">☁ アカウント</button>
+        <button id="settings-btn" type="button" title="設定">⚙</button>
         <button id="help-btn" type="button">？</button>
       </div>
     </header>
@@ -87,6 +88,9 @@
 
             <!-- 勝敗メッセージ -->
             <div id="result" class="hidden"></div>
+
+            <!-- 🎒 アイテム→経験値の変換（押すとパネルが開く） -->
+            <button id="bag-btn" type="button" title="アイテムを経験値に変換">🎒</button>
           </div><!-- /.battle-main -->
 
           <!-- 右：パネル（行動順／強化／アイテム／ログ）。どのタブでも戦闘は止まらない -->
@@ -146,21 +150,16 @@
       </div>
     </div>
 
+    <!-- キャラの詳細パネル・🎒変換パネル（開いている間は後ろの操作を受け付けない） -->
+    <div id="overlay-backdrop" class="hidden"></div>
+    <div id="unit-detail" class="float-panel hidden"></div>
+    <div id="bag-panel" class="float-panel hidden"></div>
+
     <!-- 説明の吹き出し（アイコンをタップしたとき・お知らせ） -->
     <div id="toast"></div>
   </div><!-- /#stage -->
 
-  <!-- スマホが縦向きのとき（ゲームは一時停止） -->
-  <div id="rotate-overlay" class="hidden">
-    <div class="rotate-box">
-      <div class="rotate-icon">📱↻</div>
-      <p>横向きにしてください</p>
-      <p class="rotate-note">ゲームは一時停止しています。<br>横向きにすると続きから再開します。</p>
-      <button id="fullscreen-btn" type="button">全画面で遊ぶ</button>
-    </div>
-  </div>
-
-  <!-- 読み込み順：画面 → データ → 成長要素・ダンジョン → パネル → クラウド → バトル・起動 -->
+  <!-- 読み込み順：画面 → データ → 成長要素・ダンジョン → パネル → クラウド → 詳細・🎒・設定 → バトル・起動 -->
   <script src="screen.js"></script>
   <script src="data.js"></script>
   <script src="items.js"></script>
@@ -169,6 +168,7 @@
   <script src="panel.js"></script>
   <script src="firebase-config.js"></script>
   <script src="cloud.js"></script>
+  <script src="overlay.js"></script>
   <script src="main.js"></script>
 </body>
 </html>

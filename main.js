@@ -1376,9 +1376,21 @@ const UI = {
 
   // 表示を更新する（カードは作り直さないので、再生中のアニメーションは途切れない）
   render(b) {
+    // 各キャラが「何番目に行動するか」（カードの行動順表示に使う。墨で見えないときは出さない）
+    const inked = b.allies.some(u => u.alive && hasStatus(u, 'ink'));
+    this.turnPos = new Map();
+    if (!b.over && !inked) {
+      b.orderEntries(BATTLE_CONFIG.orderPreview).forEach((e, i) => {
+        if (!this.turnPos.has(e.unit.uid)) this.turnPos.set(e.unit.uid, i);
+      });
+    }
+    this.inked = inked;
     for (const u of b.units) this.updateUnit(u, b);
     OrderList.render(b);
+    UnitDetail.refresh(); // 詳細パネルが開いていれば最新の数値に
   },
+  turnPos: new Map(),
+  inked: false,
 
   // 戦闘開始時にカードを作る
   //   .sprite-box … 立ち絵の置き場所（数字の表示もここ）
@@ -1418,9 +1430,12 @@ const UI = {
       <div class="name">${u.name}<span class="traits">${traits}</span></div>
       <div class="sub">${sub}</div>
       <div class="hpbar"><div></div></div>
+      <div class="turn-badge"></div>
       <div class="hp-text"></div>
       <div class="stats"></div>
       <div class="status"></div>`;
+    // タップで詳細パネル（攻撃・防御・速さ・レベル・バフ／デバフなど）
+    card.addEventListener('click', () => UnitDetail.open(u));
 
     // 画像が読み込めないときは、名前の1文字目を代わりに出す
     const img = card.querySelector('img.portrait');
@@ -1441,6 +1456,7 @@ const UI = {
       popups: card.querySelector('.popups'),
       hpFill: card.querySelector('.hpbar > div'),
       hpText: card.querySelector('.hp-text'),
+      turn:   card.querySelector('.turn-badge'),
       stats:  card.querySelector('.stats'),
       status: card.querySelector('.status'),
     };
@@ -1475,6 +1491,18 @@ const UI = {
     d.hpFill.style.width = `${ratio * 100}%`;
     d.hpFill.className = ratio < 0.25 ? 'low' : ratio < 0.5 ? 'mid' : '';
     d.hpText.textContent = `HP ${u.hp} / ${u.base.hp}`;
+
+    // 行動順（常に表示）：今行動中／何番目に行動するか
+    const pos = this.turnPos.get(u.uid);
+    let turn = '';
+    if (!u.alive) turn = '';
+    else if (u === b.current) turn = '▶ 行動中';
+    else if (this.inked) turn = '⏱ ？';
+    else if (pos !== undefined) turn = `⏱ ${pos + 1}番目`;
+    else turn = '⏱ まだ先';
+    d.turn.textContent = turn;
+    d.turn.classList.toggle('now', u === b.current);
+    d.turn.classList.toggle('soon', pos !== undefined && pos <= 1 && u !== b.current);
     d.stats.textContent =
       `攻${Math.round(getStat(u, 'atk'))} 防${Math.round(getStat(u, 'def'))} 速${Math.round(getStat(u, 'spd'))}` +
       ` ／ 待ち ${u.alive ? Math.round(u.wait) : '-'}`;
@@ -1605,6 +1633,8 @@ const UI = {
     this.el.autoBtn.classList.toggle('active', s.auto);
     // CSS のアニメーション速度も戦闘速度に合わせる
     document.documentElement.style.setProperty('--speed', s.speed);
+    // 設定「ステータスを常に表示」：OFF ならカードは名前・HPバー・行動順だけ
+    document.getElementById('stage').classList.toggle('show-stats', !!s.showStats);
     for (const btn of this.el.speedBtns.children) {
       btn.classList.toggle('active', Number(btn.dataset.speed) === s.speed);
     }
@@ -1836,6 +1866,7 @@ function startFloor() {
   UI.el.result.className = 'hidden';
   UI.clearCommands();
   UI.renderHeader();
+  if (UnitDetail.unit) Overlay.closeAll(); // 前の階のキャラの詳細は閉じる
 
   showArea(floor);
 
@@ -1988,10 +2019,10 @@ const HOWTO_HTML = `
     <h3>⚔ 遊び方</h3>
     <ol>
       <li><b>ダンジョンを1階ずつ進もう。</b>敵を全滅させると次の階へ。10階ごとにボスがいて、全滅すると最後に倒したボスの階に戻ります。</li>
-      <li><b>速いキャラほどたくさん行動。</b>右側の行動順リストで、これからの順番と敵の大技の予告「⚠」が見られます。</li>
+      <li><b>速いキャラほどたくさん行動。</b>キャラの下の「⏱ ○番目」と「行動順」タブで、これからの順番と敵の大技の予告「⚠」が見られます。<b>キャラをタップ</b>すると攻撃・防御・速さやバフの詳細が開きます。</li>
       <li><b>味方の番に技を選ぼう。</b>「オート」をONにすると味方も自動で戦います。×2・×4で戦闘が速くなります。</li>
       <li><b>「強化」タブ</b>：レベルアップでもらえるポイントで、ステータスや出撃枠を増やせます。戦闘中でも操作できます。</li>
-      <li><b>「アイテム」タブ</b>：5階ごとにアイテムを1つ選べます。下級アイテム2つを合成すると上級アイテムに。</li>
+      <li><b>「アイテム」タブ</b>：5階ごとにアイテムを1つ選べます。下級アイテム2つを合成すると上級アイテムに。いらないアイテムは<b>🎒ボタン</b>で経験値に変換できます。</li>
       <li><b>閉じている間も成長。</b>次に開いたとき、離れていた時間に応じて経験値がもらえます（最大8時間）。進行は自動で保存されます。</li>
     </ol>
     <p class="popup-note">アイコンにマウスを乗せる（スマホはタップする）と説明が出ます。<br>この説明は右上の「？」でいつでも見られます。<br>「☁ アカウント」からGoogleアカウントと連携すると、別の端末でも続きから遊べます。</p>
