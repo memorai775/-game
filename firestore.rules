@@ -1,0 +1,59 @@
+rules_version = '2';
+
+// =====================================================================
+// Firestore セキュリティルール
+// Firebaseコンソール → Firestore Database →「ルール」タブに、このファイルの中身を
+// まるごと貼り付けて「公開」を押してください。
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ログインしている本人か
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---- セーブデータ：本人だけが読み書きできる ----
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['data', 'lastSaved', 'updatedAt'])
+        && request.resource.data.data is string
+        && request.resource.data.data.size() < 500000
+        && request.resource.data.lastSaved is number
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // ---- ランキング：だれでも読める。書けるのは本人の分だけ。記録は減らせない ----
+    match /rankings/{uid} {
+      function validRank() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['name', 'bestFloor', 'updatedAt'])
+          && d.name is string && d.name.size() >= 1 && d.name.size() <= 12
+          && d.bestFloor is int && d.bestFloor >= 1 && d.bestFloor <= 100000
+          && d.updatedAt is timestamp;
+      }
+
+      allow read: if true;
+
+      // 初めての登録：到達時刻はサーバーの時刻
+      allow create: if isOwner(uid) && validRank()
+        && request.resource.data.updatedAt == request.time;
+
+      // 更新：記録が伸びたときは到達時刻をサーバーの時刻に。
+      //       記録が同じ（名前だけ変更）なら到達時刻は変えられない。記録を減らすことはできない
+      allow update: if isOwner(uid) && validRank()
+        && request.resource.data.bestFloor >= resource.data.bestFloor
+        && (
+          (request.resource.data.bestFloor > resource.data.bestFloor
+            && request.resource.data.updatedAt == request.time)
+          ||
+          (request.resource.data.bestFloor == resource.data.bestFloor
+            && request.resource.data.updatedAt == resource.data.updatedAt)
+        );
+
+      allow delete: if false;
+    }
+  }
+}
