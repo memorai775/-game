@@ -30,7 +30,11 @@ const Panel = {
     document.getElementById('upgrade-root').classList.toggle('hidden', name !== 'upgrade');
     document.getElementById('item-root').classList.toggle('hidden', name !== 'items');
     document.getElementById('log-root').classList.toggle('hidden', name !== 'log');
-    if (name === 'log') { const log = document.getElementById('log'); log.scrollTop = log.scrollHeight; }
+    if (name === 'log') {
+      const log = document.getElementById('log');
+      log.scrollTop = log.scrollHeight;
+      if (typeof battle !== 'undefined' && battle) UI.renderDamage(battle); // 与ダメージ表
+    }
     this.refresh();
   },
 

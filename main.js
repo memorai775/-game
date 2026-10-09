@@ -203,12 +203,27 @@ function loseHp(unit, dmg) {
   return { dmg, endured };
 }
 
+// ---------------------------------------------------------------------
+// 与ダメージの記録（キャラごと・種類ごと。ログタブとキャラの詳細で見られる）
+// ---------------------------------------------------------------------
+const DMG_KINDS = {
+  normal: '通常攻撃', skill: 'スキル', reflect: '反射', counter: '反撃', dot: '毒・やけど', extra: '追加効果',
+};
+function recordDamage(source, amount, kind) {
+  if (!source || !(amount > 0)) return;
+  const d = source.dmgDealt || (source.dmgDealt = { total: 0 });
+  d.total += amount;
+  d[kind] = (d[kind] || 0) + amount;
+}
+
 // 直接ダメージ（反射・毒・やけどなど。回避・会心・反射・反撃は起こさない）
+// kind：与ダメージの記録の種類（DMG_KINDS のキー）
 // source: ダメージの出どころ（倒したとき「倒した相手」になる）
-function directDamage(b, target, amount, label, source = null, element = null) {
+function directDamage(b, target, amount, label, source = null, element = null, kind = 'extra') {
   if (!target.alive) return;
   target.lastElement = element;
   const { dmg, endured } = loseHp(target, Math.max(1, Math.round(amount)));
+  if (source && source.side !== target.side) recordDamage(source, dmg, kind);
   deferInvertedHeal(b, target, dmg);
   b.log(`${label}${target.name}に ${dmg} のダメージ！`, 'damage');
   b.track(Anim.hit(target));
@@ -241,10 +256,11 @@ function withSpeedRescale(unit, fn) {
 // ---------------------------------------------------------------------
 // 状態異常（毒・やけど・凍結・飛翔など。種類は data.js の STATUS_INFO）
 // ---------------------------------------------------------------------
-function applyStatus(b, target, id, value, turns) {
+// source：かけた人（毒・やけどのダメージを、その人の与ダメージとして記録する）
+function applyStatus(b, target, id, value, turns, source = null) {
   if (!target.alive) return;
   target.statuses = target.statuses.filter(s => s.id !== id); // 同じ状態異常はかけ直し
-  target.statuses.push({ id, value, turns });
+  target.statuses.push({ id, value, turns, from: source ? source.uid : undefined });
   // 状態異常のエフェクト（今の技のエフェクトと同じなら重ねない）
   const fx = Fx.forStatus(id);
   if (fx !== b.currentFx) Fx.play(fx, [target]);
@@ -409,6 +425,9 @@ function strike(b, user, target, opts = {}) {
   const result = loseHp(target, dmg);
   dmg = result.dmg;
   deferInvertedHeal(b, target, dmg); // 反転：このダメージは2ターン後に回復に変わる
+  if (user.side !== target.side) {
+    recordDamage(user, dmg, opts.kind || (opts.isCounter ? 'counter' : opts.isSkill ? 'skill' : 'normal'));
+  }
   b.log(`${opts.label || ''}${crit ? '会心の一撃！ ' : ''}${target.name}に ${dmg} のダメージ！${target.guarding ? '（防御）' : ''}`, 'damage');
   b.track(Anim.hit(target));
   Anim.number(target, dmg, crit ? 'dmg crit' : 'dmg');
@@ -442,7 +461,7 @@ function strike(b, user, target, opts = {}) {
   if (!opts.secondary) {
     // 状態異常を付ける（マグマスライムのやけどなど）
     const onHit = trait(user, 'statusOnHit');
-    if (onHit && target.alive) applyStatus(b, target, onHit.status, onHit.value, onHit.turns);
+    if (onHit && target.alive) applyStatus(b, target, onHit.status, onHit.value, onHit.turns, user);
     // 麻痺・突風：相手の行動ゲージを戻す
     const push = trait(user, 'delayOnHit');
     if (push && target.alive) {
@@ -460,7 +479,7 @@ function strike(b, user, target, opts = {}) {
     }
     // 毒（毒キノコ）
     const poison = trait(user, 'poisonOnHit');
-    if (poison && target.alive) applyStatus(b, target, 'poison', poison.value, poison.turns);
+    if (poison && target.alive) applyStatus(b, target, 'poison', poison.value, poison.turns, user);
     // 凍結（氷の妖精）：相手の行動ゲージを0に戻す
     const freeze = trait(user, 'freezeOnHit');
     if (freeze && target.alive && Math.random() < freeze.chance) {
@@ -517,7 +536,7 @@ function strike(b, user, target, opts = {}) {
         amount *= ITEM_CONFIG.baseCritMultiplier + gearBonus(target, 'critDamage');
         label = `${target.name}の反射が会心！ `;
       }
-      directDamage(b, user, amount, label, target);
+      directDamage(b, user, amount, label, target, null, 'reflect');
       // 茨の神鎧：反射するたび相手の行動ゲージを減らす（同じ相手には、その相手の1行動につき1回まで）
       const rd = gearMax(target, 'reflectDelay', 'amount');
       if (rd > 0 && user.alive && user.thornMark !== user.actCount) {
@@ -661,7 +680,9 @@ const EFFECT_HANDLERS = {
     b.log(`${user.name}の鎌が${target.name}の命を刈り取った！`, 'system');
     Fx.play('fx_dark', [target], user);
     target.lastElement = null;
+    const before = target.hp;
     const { endured } = loseHp(target, target.hp);
+    recordDamage(user, before - target.hp, 'skill');
     b.track(Anim.hit(target));
     Anim.number(target, '即死', 'dmg crit');
     user.dealtDamage = true;
@@ -1617,7 +1638,10 @@ class Battle {
     for (const s of actor.statuses) {
       const info = STATUS_INFO[s.id];
       // やけどは炎の属性（やけどで倒れたゾンビは起き上がらない）
-      if (info.dot && actor.alive) directDamage(this, actor, actor.base.hp * s.value, `${info.name}で `, null, s.id === 'burn' ? 'fire' : null);
+      if (info.dot && actor.alive) {
+        const from = s.from ? this.units.find(u => u.uid === s.from) : null; // 毒・やけどをかけた人（与ダメージの記録用）
+        directDamage(this, actor, actor.base.hp * s.value, `${info.name}で `, from, s.id === 'burn' ? 'fire' : null, 'dot');
+      }
       s.turns--;
       if (s.turns <= 0 && info.deathOnExpire) doomed = true;
     }
@@ -2461,8 +2485,35 @@ const UI = {
     tip:      document.getElementById('skill-tip'),
   },
 
+  // ---- 与ダメージ表（ログタブの上）。今の戦闘と、ひとつ前の階 ----
+  lastDamage: null, // ひとつ前の戦闘の記録 { floor, rows: [{ name, image, d }] }
+  damageRows(b) {
+    return b.allies.map(u => ({ name: u.name, image: u.image, d: u.dmgDealt || { total: 0 } }))
+      .sort((x, y) => y.d.total - x.d.total);
+  },
+  damageTable(rows) {
+    const max = Math.max(1, ...rows.map(r => r.d.total));
+    return rows.map(r => {
+      const parts = Object.keys(DMG_KINDS).filter(k => r.d[k] > 0)
+        .map(k => `${DMG_KINDS[k]} ${Math.round(r.d[k]).toLocaleString()}`).join('・');
+      return `<div class="dm-row">
+        <div class="dm-head"><span class="dm-name">${r.name}</span><b>${Math.round(r.d.total).toLocaleString()}</b></div>
+        <div class="dm-bar"><div style="width:${(r.d.total / max) * 100}%"></div></div>
+        ${parts ? `<div class="dm-parts">${parts}</div>` : ''}
+      </div>`;
+    }).join('');
+  },
+  renderDamage(b) {
+    const el = document.getElementById('dmg-meter');
+    if (!el || !b || Panel.tab !== 'log') return;
+    const last = this.lastDamage && this.lastDamage.floor !== b.floor
+      ? `<details class="dm-last"><summary>前の階（${this.lastDamage.floor}階）の与ダメージ</summary>${this.damageTable(this.lastDamage.rows)}</details>` : '';
+    el.innerHTML = `<div class="dm-title">⚔ この戦闘の与ダメージ（${b.floor}階）</div>${this.damageTable(this.damageRows(b))}${last}`;
+  },
+
   // 表示を更新する（カードは作り直さないので、再生中のアニメーションは途切れない）
   render(b) {
+    this.renderDamage(b);
     // 敵のカードが多いとき（部位・召喚）は小さくして1列に収める（CSS の crowd7 / crowd9）
     const n = this.el.enemies.children.length;
     this.el.enemies.classList.toggle('crowd7', n >= 7);
@@ -3212,6 +3263,11 @@ function syncBattleAllies() {
 
 // 戦闘が終わったとき（Battle.finish から呼ばれる）
 function onBattleEnd(b, win) {
+  // 与ダメージの記録を残す（次の階で「前の階の与ダメージ」として見られる）
+  const dmgRows = UI.damageRows(b);
+  UI.lastDamage = { floor: b.floor, rows: dmgRows };
+  const topDmg = dmgRows[0] && dmgRows[0].d.total > 0
+    ? `<br>与ダメージ1位：${dmgRows[0].name}（${Math.round(dmgRows[0].d.total).toLocaleString()}）` : '';
   if (win) {
     // 経験値
     const exp = b.enemies.reduce((s, e) => s + e.exp, 0);
@@ -3286,7 +3342,7 @@ function onBattleEnd(b, win) {
       later(() => { if (battle === b) showEnding(); }, DUNGEON.floorInterval);
       return; // エンディングで選ぶまで次の階へは進まない
     }
-    UI.showResult(true, `${b.floor}階クリア！`, `${detail}<br>${gameState.floor}階へ進みます…`);
+    UI.showResult(true, `${b.floor}階クリア！`, `${detail}${topDmg}<br>${gameState.floor}階へ進みます…`);
   } else {
     // 神々の塔：全滅した回数を記録（次からその階のボスのHPが下がる救済措置）
     if (isTowerFloor(b.floor)) gameState.towerWipes[b.floor] = (gameState.towerWipes[b.floor] || 0) + 1;

@@ -1800,3 +1800,21 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 
 /* 称号（ランキング・アカウント画面の名前の横） */
 .title-badge { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 8px; font-size: 0.72rem; color: #ffd54a; background: rgba(255, 213, 74, 0.15); white-space: nowrap; }
+
+/* ---- 与ダメージ表（ログタブの上・キャラの詳細） ---- */
+#dmg-meter { margin-bottom: 8px; padding: 6px 8px; border-radius: 8px; background: #252a3b; font-size: 0.8rem; }
+#dmg-meter:empty { display: none; }
+.dm-title { font-weight: bold; color: #c0c6dc; margin-bottom: 4px; }
+.dm-row { margin: 4px 0; }
+.dm-head { display: flex; justify-content: space-between; gap: 6px; font-variant-numeric: tabular-nums; }
+.dm-head b { color: #ffd54a; }
+.dm-bar { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin: 2px 0; }
+.dm-bar > div { height: 100%; background: linear-gradient(90deg, #ff9a4a, #ffd54a); }
+.dm-parts { font-size: 0.7rem; color: #9aa3c0; }
+.dm-last { margin-top: 6px; color: #9aa3c0; }
+.dm-last summary { cursor: pointer; }
+.float-panel .dm-row { font-size: 0.85rem; }
+/* ログタブ：上に与ダメージ表、下にログ（ログはスクロール） */
+#log-root:not(.hidden) { display: flex; flex-direction: column; }
+#log-root #dmg-meter { flex: 0 0 auto; max-height: 45%; overflow-y: auto; }
+#stage #log-root #log { flex: 1 1 auto; min-height: 0; height: auto; }
