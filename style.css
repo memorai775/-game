@@ -81,7 +81,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   --area-text: #9aa3c0;
   transition: background 0.8s;
 }
-.battle-main > .field > h2 { color: var(--area-text); } /* エリアの背景の上の見出し */
+.battle-main .field > h2 { color: var(--area-text); } /* エリアの背景の上の見出し */
 
 /* エリアが変わったときの大きな表示 */
 .area-banner {
@@ -1775,3 +1775,28 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 /* 図鑑の上の記録（総撃破数・無限モード・旧記録） */
 .zk-records { margin: 4px 0 6px; font-size: 0.8rem; color: #c0c6dc; text-align: center; }
 
+
+/* 特級合成のロック・装備数 */
+.craft-tabs button.locked { opacity: 0.6; color: #9aa3c0; }
+.legend-cap { margin-left: 8px; padding: 0 6px; border-radius: 8px; font-size: 0.72rem; font-weight: normal; color: #e6d4ff; background: rgba(167, 123, 255, 0.2); }
+.legend-cap.full { color: #ffd54a; background: rgba(255, 213, 74, 0.15); }
+.zk-name small { display: block; font-size: 0.6rem; color: #9aa3c0; }
+
+/* ---- 敵・味方の欄：入りきらないときはスクロール（コマンド欄は下に固定のまま） ---- */
+#stage .battle-scroll {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 4px;
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain;          /* 端まで行っても画面全体は動かさない */
+  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+#stage .battle-scroll::-webkit-scrollbar { width: 6px; }
+#stage .battle-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.35); border-radius: 3px; }
+#stage .battle-scroll > .field { flex: 1 0 auto; }   /* 中身より小さくはしない（はみ出す分はスクロール） */
+/* 縦画面：バトル部分が伸びすぎて下のパネルを押し出さないよう、高さに上限 */
+#stage.portrait .battle-main { max-height: 600px; }
+#stage.portrait .battle-scroll { flex: 0 1 auto; }
+#stage.portrait .battle-scroll > .field { flex: 0 0 auto; }
+
+/* 称号（ランキング・アカウント画面の名前の横） */
+.title-badge { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 8px; font-size: 0.72rem; color: #ffd54a; background: rgba(255, 213, 74, 0.15); white-space: nowrap; }

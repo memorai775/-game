@@ -42,6 +42,7 @@ function newGameState() {
     pendingRewards: [], // まだ選んでいない報酬 [[アイテムID × 5], ...]
     discovered: [],     // 一度でも手に入れたアイテム（合成図鑑・📖図鑑で表示する）
     legendBest: {},     // 特級装備：系統ごとに入手した最高ランク { sword: 3, ... }（📖図鑑）
+    legendUnlocked: false, // 特級合成が解放されたか（50階のボスを初めて倒すと解放）
     saveVersion: SAVE_VERSION, // セーブデータの版（古ければ読み込み時に移行する）
     titles: [],         // 称号（名前の横に表示。例：先駆者）
     oldMaxFloor: 0,     // アップデート前の最高到達階（記録として表示）
@@ -155,6 +156,8 @@ function migrateV1toV2(s) {
   const firstMax = cycle >= 2 ? Math.max(s.bestFloor || 1, curMax) : curMax;
   const info = { target, cycle, firstMax, cycleFloor: cycle >= 2 ? curMax : 0, progress: 0, points: 0, items: 0, title: null };
   delete s.cycle; // 周回はなくなった
+  // 特級合成：以前の最高到達階が50以上、または2周目以降の人は最初から解放
+  if (firstMax >= LEGEND.unlockFloor || cycle >= 2) s.legendUnlocked = true;
   if (target) {
     // 以前の到達度
     info.progress = Math.max(0, firstMax - m.baseFloor) + (cycle >= 2 ? curMax + m.baseFloor : 0);
@@ -274,6 +277,25 @@ function applySaveDataRaw(saved) {
   }
   if (!Array.isArray(gameState.partsShown)) gameState.partsShown = [];
   if (!gameState.legendBest || typeof gameState.legendBest !== 'object') gameState.legendBest = {};
+  // 特級合成の解放：項目が無い古いデータは、50階のボスを倒している（または特級を持っている）なら解放済みにする
+  if (saved && saved.legendUnlocked === undefined) {
+    const owns = Object.keys(gameState.legendBest).length > 0
+      || gameState.inventory.some(id => ITEMS[id].tier === 3)
+      || Object.values(gameState.equips).some(l => l.some(id => ITEMS[id].tier === 3));
+    gameState.legendUnlocked = owns || gameState.maxFloor > LEGEND.unlockFloor
+      || (gameState.bestFloor || 1) > LEGEND.unlockFloor || gameState.partsShown.includes(LEGEND.unlockFloor);
+  }
+  // 安全対策：特級装備を1人 LEGEND.perChar 個より多く付けていたら、超えた分を外して所持品に戻す
+  for (const id in gameState.equips) {
+    let n = 0;
+    gameState.equips[id] = gameState.equips[id].filter(itemId => {
+      if (ITEMS[itemId].tier !== 3) return true;
+      n++;
+      if (n <= LEGEND.perChar) return true;
+      gameState.inventory.push(itemId);
+      return false;
+    });
+  }
   // 装備枠：多すぎる分は所持品に戻す（枠を減らしたときのため）
   for (const id in gameState.equips) {
     const extra = gameState.equips[id].splice(ITEM_CONFIG.slotsPerChar);
@@ -282,6 +304,12 @@ function applySaveDataRaw(saved) {
   if (!gameState.towerWipes || typeof gameState.towerWipes !== 'object') gameState.towerWipes = {};
   delete gameState.part1Shown;
   delete gameState.cycle; // 周回はなくなった
+}
+
+// ランキングで名前の横に出す称号（いちばん新しくもらったもの。無ければ ''）
+function currentTitle() {
+  const t = gameState.titles || [];
+  return t.length ? t[t.length - 1] : '';
 }
 
 // 旧記録（アップデート前の記録）の文章。無ければ ''
@@ -440,13 +468,22 @@ function equippedItems(charId) {
   return gameState.equips[charId] || [];
 }
 
+// 装備している特級装備の数
+function legendCount(charId) {
+  return equippedItems(charId).filter(id => ITEMS[id] && ITEMS[id].tier === 3).length;
+}
+
+// 装備する。装備できなかったときは理由を返す（'full'：枠がいっぱい / 'legendLimit'：特級は1人 LEGEND.perChar 個まで）
 function equipItem(charId, itemId) {
   const list = gameState.equips[charId] = equippedItems(charId);
   const idx = gameState.inventory.indexOf(itemId);
-  if (idx === -1 || list.length >= ITEM_CONFIG.slotsPerChar) return;
+  if (idx === -1) return 'missing';
+  if (list.length >= ITEM_CONFIG.slotsPerChar) return 'full';
+  if (ITEMS[itemId].tier === 3 && legendCount(charId) >= LEGEND.perChar) return 'legendLimit';
   gameState.inventory.splice(idx, 1);
   list.push(itemId);
   saveGame();
+  return null;
 }
 
 // 外したアイテムは所持品に戻る
@@ -583,6 +620,7 @@ function hasItems(ids) {
 
 // 特級合成する。family：同数で並んだときに選んだ系統（下級素材のID）。できた特級装備のIDを返す
 function craftLegend(highIds, family) {
+  if (!gameState.legendUnlocked) return null; // 50階のボスを倒すまでは作れない
   if (highIds.length !== 3 || !highIds.every(id => ITEMS[id] && ITEMS[id].tier === 2) || !hasItems(highIds)) return null;
   const pv = legendPreview(highIds);
   const base = pv.candidates.includes(family) ? family : pv.candidates[0];

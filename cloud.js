@@ -315,23 +315,35 @@ const Cloud = {
     if (this.rankDoc && !gameState.nickname) gameState.nickname = this.rankDoc.name;
   },
 
-  // 最高記録を更新したとき（またはニックネームを変えたとき）だけ書き込む
+  // 最高記録を更新したとき（またはニックネーム・称号が変わったとき）だけ書き込む
+  titleUnsupported: false, // Firestore のルールが古くて称号を保存できないとき true（称号なしで登録する）
   async submitRanking() {
     if (!this.ready || !gameState.nickname) return;
     const name = gameState.nickname;
+    const title = this.titleUnsupported ? '' : currentTitle();
     const best = Math.floor(gameState.bestFloor || 1);
     const cur = this.rankDoc;
-    if (cur && best <= cur.bestFloor && cur.name === name) return; // 変更なし
+    if (cur && best <= cur.bestFloor && cur.name === name && (cur.title || '') === title) return; // 変更なし
 
     let data;
     if (!cur || best > cur.bestFloor) {
       // 記録更新：到達した時刻を記録（同じ階層なら早く到達した人が上）
       data = { name, bestFloor: best, updatedAt: this.fb.serverTimestamp() };
     } else {
-      // 名前だけ変更：記録と到達時刻はそのまま
+      // 名前・称号だけ変更：記録と到達時刻はそのまま
       data = { name, bestFloor: cur.bestFloor, updatedAt: cur.updatedAt };
     }
-    await this.fb.setDoc(this.rankRef(), data);
+    if (title) data.title = title; // 称号（名前の横に表示）
+    try {
+      await this.fb.setDoc(this.rankRef(), data);
+    } catch (e) {
+      // ルールがまだ古い（称号の項目を許可していない）ときは、称号なしで登録し直す
+      if (!data.title || e.code !== 'permission-denied') throw e;
+      console.warn('ランキングに称号を保存できませんでした。Firestore のルールを更新してください', e);
+      this.titleUnsupported = true;
+      delete data.title;
+      await this.fb.setDoc(this.rankRef(), data);
+    }
     const snap = await this.fb.getDoc(this.rankRef());
     this.rankDoc = snap.data();
   },
@@ -361,10 +373,10 @@ const Cloud = {
         const r = d.data();
         const mine = d.id === this.user.uid;
         return `<tr class="${mine ? 'mine' : ''}${i < 3 ? ` top${i + 1}` : ''}">
-          <td class="rank">${i + 1}</td><td class="rname">${escapeHtml(r.name)}${mine ? '（あなた）' : ''}</td><td class="rfloor">${r.bestFloor}階</td></tr>`;
+          <td class="rank">${i + 1}</td><td class="rname">${escapeHtml(r.name)}${r.title ? ` <span class="title-badge">🏅${escapeHtml(r.title)}</span>` : ''}${mine ? '（あなた）' : ''}</td><td class="rfloor">${r.bestFloor}階</td></tr>`;
       }).join('');
       const mine = me
-        ? `<div class="my-rank">あなたの順位：<strong>${myRank}位</strong>（${me.bestFloor}階・${escapeHtml(me.name)}）</div>`
+        ? `<div class="my-rank">あなたの順位：<strong>${myRank}位</strong>（${me.bestFloor}階・${escapeHtml(me.name)}${me.title ? ` 🏅${escapeHtml(me.title)}` : ''}）</div>`
         : `<div class="my-rank">まだランキングに登録されていません。<button id="rank-name-btn">ニックネームを決めて登録</button></div>`;
       Modal.setBody(`${mine}
         <div class="rank-scroll"><table class="rank-table">

@@ -33,7 +33,7 @@
   <meta name="twitter:description" content="ゆーるぴーじー：仲間を集め、強化とアイテム合成で100階層のダンジョンに挑む放置ターン制RPG。">
   <meta name="twitter:image" content="characters/hero.png">
 
-  <link rel="stylesheet" href="style.css?v=202610100500">
+  <link rel="stylesheet" href="style.css?v=202610100700">
 </head>
 <body>
   <!-- ゲーム画面（960×540 の16:9。screen.js が画面サイズに合わせて拡大縮小する） -->
@@ -76,17 +76,20 @@
               <button id="giveup-btn" type="button" title="諦めてチェックポイントに戻る">🏳 諦める</button>
             </div>
 
-            <!-- 敵 -->
-            <section class="field">
-              <h2>敵</h2>
-              <div id="enemy-area" class="unit-row"></div>
-            </section>
+            <!-- 敵と味方（敵が多くて入りきらないときは、ここだけスクロールできる。コマンドは下に固定） -->
+            <div class="battle-scroll" id="battle-scroll">
+              <!-- 敵 -->
+              <section class="field">
+                <h2>敵</h2>
+                <div id="enemy-area" class="unit-row"></div>
+              </section>
 
-            <!-- 味方（出撃枠ぶん並ぶ） -->
-            <section class="field">
-              <h2>味方</h2>
-              <div id="ally-area" class="unit-row"></div>
-            </section>
+              <!-- 味方（出撃枠ぶん並ぶ） -->
+              <section class="field">
+                <h2>味方</h2>
+                <div id="ally-area" class="unit-row"></div>
+              </section>
+            </div>
 
             <!-- コマンド -->
             <section id="command-area">
@@ -178,17 +181,17 @@
 
   <!-- ?v= の数字は版番号。ファイルを更新したら数字を変えると、ブラウザが古いファイルを使わずに読み込み直す -->
   <!-- 読み込み順：画面 → データ → 成長要素・ダンジョン → パネル → クラウド → 詳細・🎒・設定 → バトル・起動 -->
-  <script src="screen.js?v=202610100500"></script>
-  <script src="data.js?v=202610100500"></script>
-  <script src="items.js?v=202610100500"></script>
-  <script src="progress.js?v=202610100500"></script>
-  <script src="dungeon.js?v=202610100500"></script>
-  <script src="panel.js?v=202610100500"></script>
-  <script src="firebase-config.js?v=202610100500"></script>
-  <script src="cloud.js?v=202610100500"></script>
-  <script src="overlay.js?v=202610100500"></script>
-  <script src="zukan.js?v=202610100500"></script>
-  <script src="effects.js?v=202610100500"></script>
-  <script src="main.js?v=202610100500"></script>
+  <script src="screen.js?v=202610100700"></script>
+  <script src="data.js?v=202610100700"></script>
+  <script src="items.js?v=202610100700"></script>
+  <script src="progress.js?v=202610100700"></script>
+  <script src="dungeon.js?v=202610100700"></script>
+  <script src="panel.js?v=202610100700"></script>
+  <script src="firebase-config.js?v=202610100700"></script>
+  <script src="cloud.js?v=202610100700"></script>
+  <script src="overlay.js?v=202610100700"></script>
+  <script src="zukan.js?v=202610100700"></script>
+  <script src="effects.js?v=202610100700"></script>
+  <script src="main.js?v=202610100700"></script>
 </body>
 </html>

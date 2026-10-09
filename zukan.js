@@ -56,6 +56,7 @@ const Zukan = {
 
   itemHint(id) {
     if (ITEMS[id].tier === 1) return '階層クリアの報酬で手に入る';
+    if (ITEMS[id].tier === 3 && !gameState.legendUnlocked) return `？？？（${LEGEND.unlockFloor}階のボスを倒すと解放）`;
     if (ITEMS[id].tier === 3) return `特級合成：上級装備3つの素材に「${ITEMS[ITEMS[id].family].name}」が一番多く含まれていると作れる`;
     const r = RECIPES.find(x => x.result === id);
     return r ? `合成：${ITEMS[r.items[0]].name}＋${ITEMS[r.items[1]].name}` : '？？？';
@@ -87,7 +88,7 @@ const Zukan = {
         const known = this.isKnown(id);
         return `<button class="zk-cell item${known ? '' : ' unknown'}${ITEMS[id].tier === 3 ? ' legend' : ''}" data-kind="item" data-id="${id}">
           ${itemIcon(id, 'md', !known)}
-          <span class="zk-name">${known ? ITEMS[id].name : '？？？'}</span>
+          <span class="zk-name">${known ? ITEMS[id].name : (ITEMS[id].tier === 3 && !gameState.legendUnlocked ? `？？？<small>（${LEGEND.unlockFloor}階のボスを倒すと解放）</small>` : '？？？')}</span>
         </button>`;
       }).join('');
     }

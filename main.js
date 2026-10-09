@@ -3266,6 +3266,16 @@ function onBattleEnd(b, win) {
       saveGame();
       showPartClear(b.floor);
     }
+    // 特級合成の解放（50階のボスを初めて倒したとき。「第一部クリア」のお知らせのあとに出る）
+    if (b.floor === LEGEND.unlockFloor && !gameState.legendUnlocked) {
+      gameState.legendUnlocked = true;
+      saveGame();
+      b.log('特級合成が解放されました！', 'system');
+      UI.popup(`
+        <p class="popup-title">✨ 特級合成が解放されました！</p>
+        <p>上級装備を3つ合成すると、強力な<b>特級装備</b>（★1〜★5）が作れるようになりました。</p>
+        <p class="popup-note">「アイテム」タブの合成欄にある「特級合成」から作れます。<br>特級装備は1人${LEGEND.perChar}個まで装備できます。</p>`);
+    }
     UI.announceRecruits(checkRecruits()); // 到達階・ボス撃破で加入条件を満たしたか
     if (ending) {
       gameState.endingShown = true;

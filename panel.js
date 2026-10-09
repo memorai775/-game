@@ -372,7 +372,9 @@ const ItemUI = {
     for (const charId of gameState.party) {
       const box = document.createElement('div');
       box.className = 'equip-box';
-      box.innerHTML = `<div class="equip-char">${CHARACTERS[charId].name}${gameState.sortie.includes(charId) ? '' : '（控え）'}</div>`;
+      const lc = legendCount(charId);
+      box.innerHTML = `<div class="equip-char">${CHARACTERS[charId].name}${gameState.sortie.includes(charId) ? '' : '（控え）'}` +
+        `<span class="legend-cap${lc >= LEGEND.perChar ? ' full' : ''}">特級 ${lc}/${LEGEND.perChar}</span></div>`;
       const equips = equippedItems(charId);
       for (let slot = 0; slot < ITEM_CONFIG.slotsPerChar; slot++) {
         const row = document.createElement('div');
@@ -417,8 +419,14 @@ const ItemUI = {
       cell.className = 'pick-cell';
       cell.innerHTML = `${itemIcon(id, 'md')}<span class="pick-text">${itemLabel(id)} ×${counts[id]}<small>${ITEMS[id].desc}</small></span>`;
       cell.addEventListener('click', () => {
+        const err = equipItem(charId, id);
+        if (err === 'legendLimit') {
+          // 特級は1人2個まで：装備させずにお知らせ（選ぶ画面は開いたまま）
+          const msg = `特級装備は1人${LEGEND.perChar}個までです`;
+          if (typeof showToast === 'function') showToast(msg); else alert(msg);
+          return;
+        }
         this.picking = null;
-        equipItem(charId, id);
         afterProgressChange();
       });
       box.appendChild(cell);
@@ -476,12 +484,23 @@ const ItemUI = {
     // 通常合成／特級合成のタブ
     const tabs = document.createElement('div');
     tabs.className = 'craft-tabs';
-    for (const [key, label] of [['normal', '通常合成'], ['legend', '✨ 特級合成']]) {
+    // 特級合成は50階のボスを倒すまでロック（鍵マーク。押すと解放条件を表示）
+    const locked = !gameState.legendUnlocked;
+    if (locked && this.craftTab === 'legend') this.craftTab = 'normal';
+    for (const [key, label] of [['normal', '通常合成'], ['legend', locked ? '🔒 特級合成' : '✨ 特級合成']]) {
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = label;
-      b.className = this.craftTab === key ? 'active' : '';
-      b.addEventListener('click', () => { this.craftTab = key; this.render(); });
+      b.className = (this.craftTab === key ? 'active' : '') + (key === 'legend' && locked ? ' locked' : '');
+      b.addEventListener('click', () => {
+        if (key === 'legend' && !gameState.legendUnlocked) {
+          const msg = `${LEGEND.unlockFloor}階のボスを倒すと解放されます`;
+          if (typeof showToast === 'function') showToast(msg); else alert(msg);
+          return;
+        }
+        this.craftTab = key;
+        this.render();
+      });
       tabs.appendChild(b);
     }
     sec.appendChild(tabs);
