@@ -309,8 +309,9 @@ const CHARACTERS = {
     join: { defeatBoss: 10 },
     skills: ['attack', 'heal', 'healAll'],
     autoRules: [
-      { skill: 'healAll', when: { allyHpBelow: 0.6, allyCount: 2 } },
-      { skill: 'heal',    when: { allyHpBelow: 0.6 } },
+      // 回復優先：少しでも減った味方がいれば回復（2人以上なら全体回復）。全員ほぼ満タンのときだけ攻撃
+      { skill: 'healAll', when: { allyHpBelow: 0.85, allyCount: 2 } },
+      { skill: 'heal',    when: { allyHpBelow: 0.85 } },
       { skill: 'attack' },
     ],
   },
@@ -330,7 +331,7 @@ const CHARACTERS = {
     join: { defeatBoss: 20 },
     skills: ['attack', 'defend', 'fireball', 'inferno', 'focus'],
     autoRules: [
-      { skill: 'inferno',  when: { enemyCount: 2 } }, // 敵が2体以上なら全体攻撃
+      { skill: 'inferno' }, // 爆炎を最優先（使えるときは敵が1体でも使う）
       { skill: 'fireball' },
     ],
   },

@@ -1582,3 +1582,86 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 
 /* 縦画面で強化・アイテムを開いて小さくしているときは、エフェクトも小さめに */
 #stage.portrait:not([data-tab="order"]) .fx { transform-origin: center; scale: 0.5; }
+/* =====================================================================
+   スキル一覧・スキルの吹き出し・所持品の格子・諦めるボタン・強化画面のずれ対策
+   ===================================================================== */
+
+/* ---- スキル一覧（強化タブのキャラ詳細・仲間加入のお知らせ） ---- */
+.skill-box { margin: 4px 0 8px; font-size: 0.8rem; }
+.skill-box summary { cursor: pointer; color: #9aa3c0; padding: 2px 0; }
+.skill-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.skill-list li { padding: 4px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); text-align: left; }
+.skill-list .skill-name { font-weight: bold; color: #e8e8f0; }
+.skill-list .skill-limit {
+  margin-left: 6px; padding: 0 6px; border-radius: 8px;
+  font-size: 0.7rem; color: #ffd54a; background: rgba(255, 213, 74, 0.12);
+}
+.skill-list small { display: block; color: #9aa3c0; font-size: 0.75rem; margin-top: 1px; }
+.popup-skills { margin-top: 8px; max-height: 220px; overflow-y: auto; font-size: 0.85rem; }
+.popup-skills-title { font-weight: bold; color: #c0c6dc; margin-bottom: 2px; text-align: left; }
+
+/* ---- スキルの説明の吹き出し ---- */
+#skill-tip {
+  position: absolute; z-index: 55; max-width: 280px; padding: 7px 10px;
+  border-radius: 8px; border: 1px solid #6a9ae0; background: rgba(20, 24, 36, 0.96);
+  color: #e8e8f0; font-size: 12px; line-height: 1.5; pointer-events: none;
+  opacity: 0; visibility: hidden; transition: opacity 0.12s;
+  left: 0; top: 0;
+}
+#skill-tip.show { opacity: 1; visibility: visible; }
+#skill-tip .tip-limit { margin-left: 6px; font-size: 11px; color: #ffd54a; }
+#command-buttons button { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+#command-buttons button.is-disabled { opacity: 0.45; cursor: default; }
+
+/* ---- 所持品：アイコンの格子（タップで名前と効果） ---- */
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; }
+.inv-cell {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  padding: 3px; border-radius: 8px; background: transparent; border: 2px solid transparent;
+}
+.inv-cell.selected { border-color: #6a9ae0; background: rgba(106, 154, 224, 0.15); }
+.inv-count {
+  position: absolute; right: 2px; bottom: 1px; padding: 0 4px; border-radius: 6px;
+  font-size: 0.7rem; font-weight: bold; color: #fff; background: rgba(0, 0, 0, 0.7);
+}
+.inv-info { display: flex; align-items: center; gap: 8px; margin-top: 8px; min-height: 58px; }
+
+/* ---- 装備の選択（アイコンで選ぶ） ---- */
+.equip-slot .empty-text { color: #6a7290; }
+.equip-picker { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 6px 10px; padding-left: 8px; border-left: 2px solid #4a5270; }
+.pick-cell { display: flex; align-items: center; gap: 8px; text-align: left; padding: 4px 6px; }
+.pick-cell .pick-text { flex: 1; min-width: 0; }
+.pick-cell small { display: block; font-size: 0.72rem; color: #9aa3c0; }
+.craft-pick { display: inline-flex; vertical-align: middle; margin-right: 3px; }
+
+/* ---- 諦めるボタン（小さく目立たない。🎒ボタンと重ならないよう右に余白） ---- */
+#stage .controls #giveup-btn {
+  margin-left: auto; margin-right: 52px;
+  padding: 2px 8px; font-size: 11px;
+  color: #8a91aa; background: rgba(30, 34, 48, 0.6); border-color: #3a4058;
+}
+#stage .controls #giveup-btn:hover { color: #ffb0b0; border-color: #a05050; }
+#stage.portrait:not([data-tab="order"]) .controls #giveup-btn { margin-right: 42px; font-size: 10px; padding: 1px 6px; }
+
+/* ---- 遊び方の上のゲーム名 ---- */
+.howto-logo {
+  text-align: center; font-size: 2rem; font-weight: bold; letter-spacing: 0.08em;
+  color: #ffd54a; text-shadow: 0 2px 0 #7a5a10, 0 0 12px rgba(255, 213, 74, 0.5); margin-bottom: 4px;
+}
+
+/* ---- 強化画面：ボタンを押しても画面がずれないように ---- */
+/* 数値の桁が増えても幅が変わらないよう、等幅の数字＋列の幅を固定 */
+.stat-table { table-layout: fixed; font-variant-numeric: tabular-nums; }
+.stat-table th { width: 3em; }
+.stat-table .val { width: 3.5em; }
+.stat-table .bonus { width: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.stat-table .up { width: 8.5em; text-align: right; }
+.stat-table button { min-width: 3.6em; }
+#upgrade-root .points strong, .slot-box, .char-card .sub, .char-card .name { font-variant-numeric: tabular-nums; }
+/* 画像の大きさを固定（時の魔導士のように絵の輪が大きくても行の高さが変わらない） */
+#side-panel .char-card .portrait { width: 80px; height: 80px; min-height: 80px; flex: none; overflow: hidden; }
+#side-panel .char-card .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 強化・アイテム画面ではアニメーションを止める */
+#upgrade-root *, #item-root * { animation: none !important; transition: none !important; }
+/* スクロール位置を中身の変化に引っぱられないように */
+#panel-body { overflow-anchor: none; }

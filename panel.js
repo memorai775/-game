@@ -35,9 +35,13 @@ const Panel = {
   },
 
   // 開いているタブを描き直す（ポイントや報酬が増えたときにも呼ぶ）
+  // 描き直してもスクロール位置が飛ばないよう、前の位置を覚えて戻す
   refresh() {
+    const body = document.getElementById('panel-body');
+    const top = body.scrollTop;
     if (this.tab === 'upgrade') UpgradeUI.render();
     if (this.tab === 'items') ItemUI.render();
+    if (body.scrollTop !== top) body.scrollTop = top;
     this.renderBadge();
   },
 
@@ -89,20 +93,85 @@ function itemIcon(id, size = 'md', unknown = false) {
   return `<span class="item-icon ${size} tier${item.tier}${item.image ? '' : ' noimg'}${unknown ? ' unknown' : ''}" data-initial="${initial}" title="${title}">${inner}</span>`;
 }
 
+// スキルの使用制限の説明（cooldown 3 ＝ 使ったあと3ターン休み ＝「4ターンに1回」）
+function skillLimitText(skill) {
+  const parts = [];
+  if (skill.oncePerBattle) parts.push('1戦闘1回');
+  else if (skill.cooldown) parts.push(`${skill.cooldown + 1}ターンに1回`);
+  if (skill.needsKi) parts.push('気が必要');
+  return parts.length ? parts.join('・') : 'いつでも使える';
+}
+
+// スキルの効果の説明（使用制限は別に表示するので、説明文の中の「（4ターンに1回）」などは省く）
+function skillDescText(skill) {
+  return (skill.desc || '')
+    .replace(/[（(](\d+ターンに1回|1戦闘1回|使用後\d+ターン使用不可)[）)]/g, '')
+    .replace(/。1戦闘1回$/, '');
+}
+
+// キャラのスキル一覧（名前・効果・使用制限）。強化タブと仲間加入のお知らせで使う
+function skillListHtml(charId) {
+  return `<ul class="skill-list">${CHARACTERS[charId].skills.map(id => {
+    const s = SKILLS[id];
+    return `<li><span class="skill-name">${s.name}</span><span class="skill-limit">${skillLimitText(s)}</span>` +
+      `<small>${skillDescText(s)}</small></li>`;
+  }).join('')}</ul>`;
+}
+
+// 作り直した画面（next）を今の画面（cur）に重ねて、変わったところだけ書き換える
+// 形（要素の種類や数）が同じ部分はそのまま残すので、画像の読み直しやスクロールのずれが起きない
+// 形が違う部分だけ丸ごと入れ替える
+function patchDom(cur, next) {
+  if (cur.nodeType !== next.nodeType || cur.nodeName !== next.nodeName ||
+      cur.childNodes.length !== next.childNodes.length) {
+    cur.replaceWith(next);
+    return;
+  }
+  if (cur.nodeType === Node.TEXT_NODE) {
+    if (cur.nodeValue !== next.nodeValue) cur.nodeValue = next.nodeValue;
+    return;
+  }
+  if (cur.nodeType !== Node.ELEMENT_NODE) return;
+  // 属性を合わせる
+  for (const a of [...cur.attributes]) {
+    if (!next.hasAttribute(a.name)) cur.removeAttribute(a.name);
+  }
+  for (const a of [...next.attributes]) {
+    if (cur.getAttribute(a.name) !== a.value) cur.setAttribute(a.name, a.value);
+  }
+  if (cur.nodeName === 'INPUT') cur.checked = next.checked;
+  if ('disabled' in cur) cur.disabled = next.disabled;
+  const kids = [...next.childNodes];
+  [...cur.childNodes].forEach((c, i) => patchDom(c, kids[i]));
+}
+
 // ---------------------------------------------------------------------
 // 強化タブ
 // ---------------------------------------------------------------------
 const UpgradeUI = {
   root: document.getElementById('upgrade-root'),
+  openSkills: new Set(), // スキル欄を開いているキャラ（描き直しても開いたままにする）
 
+  // 新しく作った画面を、今の画面に「変わったところだけ」反映する
+  // （「＋」を押すたびに全部作り直すと、画面がずれたりスクロールが飛んだりするため）
   render() {
-    this.root.innerHTML = '';
+    const fresh = document.createElement('div');
+    this.build(fresh);
+    if (this.root.childNodes.length === fresh.childNodes.length) {
+      const kids = [...fresh.childNodes];
+      [...this.root.childNodes].forEach((c, i) => patchDom(c, kids[i]));
+    } else {
+      this.root.replaceChildren(...fresh.childNodes);
+    }
+  },
+
+  build(root) {
 
     // --- 残りポイント ---
     const head = document.createElement('div');
     head.className = 'upgrade-head';
     head.innerHTML = `<div class="points">残りポイント：<strong>${gameState.points}</strong></div>`;
-    this.root.appendChild(head);
+    root.appendChild(head);
 
     // --- 出撃枠 ---
     const slotBox = document.createElement('div');
@@ -118,7 +187,7 @@ const UpgradeUI = {
     note.className = 'panel-note';
     note.textContent = '※ 出撃メンバーの入れ替えは次の階から。強化・装備はすぐ反映されます。';
     slotBox.appendChild(note);
-    this.root.appendChild(slotBox);
+    root.appendChild(slotBox);
 
     // --- キャラ一覧（加入済みは強化カード、未加入はシルエット） ---
     const list = document.createElement('div');
@@ -126,7 +195,7 @@ const UpgradeUI = {
     for (const id of Object.keys(CHARACTERS)) {
       list.appendChild(gameState.party.includes(id) ? this.charCard(id) : this.lockedCard(id));
     }
-    this.root.appendChild(list);
+    root.appendChild(list);
 
     // --- データ初期化 ---
     const reset = document.createElement('button');
@@ -137,7 +206,7 @@ const UpgradeUI = {
         restartFromScratch();
       }
     });
-    this.root.appendChild(reset);
+    root.appendChild(reset);
   },
 
   // キャラ1人分のカード
@@ -204,9 +273,20 @@ const UpgradeUI = {
         : '<div class="panel-note">なし（「アイテム」タブで装備）</div>');
     card.appendChild(eq);
 
-    // 振り直し
+    // スキル一覧（名前・効果・使用制限）
+    const sk = document.createElement('details');
+    sk.className = 'skill-box';
+    sk.innerHTML = `<summary>スキル（${t.skills.length}）</summary>${skillListHtml(id)}`;
+    if (this.openSkills.has(id)) sk.open = true;
+    sk.addEventListener('toggle', () => {
+      if (sk.open) this.openSkills.add(id); else this.openSkills.delete(id);
+    });
+    card.appendChild(sk);
+
+    // 振り直し（ポイントは押した時点の値を表示する）
     card.appendChild(panelButton('振り直し', c.spent === 0, () => {
-      if (confirm(`${t.name}に使った ${c.spent} ポイントを全部戻します。よろしいですか？`)) resetCharUpgrades(id);
+      const spent = gameState.chars[id].spent;
+      if (confirm(`${t.name}に使った ${spent} ポイントを全部戻します。よろしいですか？`)) resetCharUpgrades(id);
     }));
     return card;
   },
@@ -288,18 +368,21 @@ const ItemUI = {
           row.innerHTML = `${itemIcon(itemId, 'md')}<span class="slot-text">${itemLabel(itemId)}<small>${ITEMS[itemId].desc}</small></span>`;
           row.appendChild(panelButton('外す', false, () => unequipItem(charId, slot)));
         } else {
-          // 空き枠：点線の枠＋所持品から選んで装備
-          row.insertAdjacentHTML('beforeend', '<span class="item-icon md empty"></span>');
-          const select = document.createElement('select');
-          select.innerHTML = '<option value="">― 空き（所持品から装備）―</option>' +
-            Object.keys(counts).map(id => `<option value="${id}">${ITEMS[id].name} ×${counts[id]}</option>`).join('');
-          select.disabled = Object.keys(counts).length === 0;
-          select.addEventListener('change', () => {
-            if (!select.value) return;
-            equipItem(charId, select.value);
-            afterProgressChange();
+          // 空き枠：点線の枠＋「装備する」で所持品のアイコンから選ぶ
+          const picking = this.picking && this.picking.charId === charId && this.picking.slot === slot;
+          row.insertAdjacentHTML('beforeend', '<span class="item-icon md empty"></span><span class="slot-text empty-text">空き</span>');
+          const has = Object.keys(counts).length > 0;
+          const btn = document.createElement('button');
+          btn.textContent = picking ? 'やめる' : (has ? '装備する' : '所持品なし');
+          btn.disabled = !has;
+          btn.addEventListener('click', () => {
+            this.picking = picking ? null : { charId, slot };
+            Panel.refresh();
           });
-          row.appendChild(select);
+          row.appendChild(btn);
+          box.appendChild(row);
+          if (picking) box.appendChild(this.equipPicker(charId, counts));
+          continue;
         }
         box.appendChild(row);
       }
@@ -307,7 +390,30 @@ const ItemUI = {
     }
   },
 
-  // --- 所持品（装備していないもの） ---
+  picking: null, // 装備するアイテムを選んでいる枠 { charId, slot }
+
+  // 装備の選択：所持品をアイコンで並べ、タップで装備
+  equipPicker(charId, counts) {
+    const box = document.createElement('div');
+    box.className = 'equip-picker';
+    for (const id of Object.keys(counts)) {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'pick-cell';
+      cell.innerHTML = `${itemIcon(id, 'md')}<span class="pick-text">${itemLabel(id)} ×${counts[id]}<small>${ITEMS[id].desc}</small></span>`;
+      cell.addEventListener('click', () => {
+        this.picking = null;
+        equipItem(charId, id);
+        afterProgressChange();
+      });
+      box.appendChild(cell);
+    }
+    return box;
+  },
+
+  selectedInv: null, // 所持品でタップしたアイテム（名前と効果を下に出す）
+
+  // --- 所持品（装備していないもの）：アイコンを格子状に並べ、タップで名前と効果 ---
   renderInventory() {
     const sec = this.section('所持品');
     const counts = inventoryCounts();
@@ -316,10 +422,30 @@ const ItemUI = {
       sec.insertAdjacentHTML('beforeend', '<div class="panel-note">なし（5階ごとのクリア報酬で手に入る）</div>');
       return;
     }
+    if (!counts[this.selectedInv]) this.selectedInv = null;
+    const grid = document.createElement('div');
+    grid.className = 'inv-grid';
+    const info = document.createElement('div');
+    info.className = 'inv-info';
+    const showInfo = id => {
+      info.innerHTML = id
+        ? `${itemIcon(id, 'lg')}<span>${itemLabel(id)}${ITEMS[id].tier === 2 ? ' ★上級' : ''} ×${counts[id]}<small>${ITEMS[id].desc}</small></span>`
+        : '<span class="panel-note">アイコンをタップすると名前と効果が出ます</span>';
+    };
     for (const id of ids) {
-      sec.insertAdjacentHTML('beforeend',
-        `<div class="inv-row icon-row">${itemIcon(id, 'md')}<span>${itemLabel(id)} ×${counts[id]}<small>${ITEMS[id].desc}</small></span></div>`);
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'inv-cell' + (id === this.selectedInv ? ' selected' : '');
+      cell.innerHTML = `${itemIcon(id, 'lg')}${counts[id] > 1 ? `<span class="inv-count">×${counts[id]}</span>` : ''}`;
+      cell.addEventListener('click', () => {
+        this.selectedInv = id;
+        for (const c of grid.children) c.classList.toggle('selected', c === cell);
+        showInfo(id);
+      });
+      grid.appendChild(cell);
     }
+    showInfo(this.selectedInv);
+    sec.append(grid, info);
   },
 
   // --- 合成：レシピ一覧（作れるものは光る）と、2つ選んで合成 ---
@@ -339,6 +465,17 @@ const ItemUI = {
     const b = document.createElement('select');
     a.innerHTML = options;
     b.innerHTML = options;
+    // 選んだ素材のアイコンを横に出す（空のときは点線の枠）
+    const preview = sel => {
+      const span = document.createElement('span');
+      span.className = 'craft-pick';
+      const show = () => { span.innerHTML = sel.value ? itemIcon(sel.value, 'sm') : '<span class="item-icon sm empty"></span>'; };
+      sel.addEventListener('change', show);
+      show();
+      return span;
+    };
+    const pa = preview(a);
+    const pb = preview(b);
     const btn = document.createElement('button');
     btn.textContent = '合成';
     btn.addEventListener('click', () => {
@@ -351,7 +488,7 @@ const ItemUI = {
       }
       afterProgressChange();
     });
-    free.append(a, ' ＋ ', b, ' ', btn);
+    free.append(pa, a, ' ＋ ', pb, b, ' ', btn);
     sec.appendChild(free);
 
     // --- 合成図鑑（全レシピ。未入手はシルエットで素材だけ見せる） ---

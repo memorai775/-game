@@ -4,8 +4,8 @@
   <meta name="google-site-verification" content="irdPqtMk6PcgJ8FRk1Z8KXDPZTI-yWtnmuB1Z1at9_s" />
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>ターン制バトル｜50階層ダンジョンRPG</title>
-  <meta name="description" content="ブラウザで遊べるターン制バトルRPG。仲間を集め、強化とアイテム合成で50階層のダンジョンに挑もう。オートバトル・放置成長・ランキングにも対応。">
+  <title>ゆーるぴーじー｜ブラウザで遊べる放置ターン制RPG</title>
+  <meta name="description" content="ゆーるぴーじーは、ブラウザで遊べる放置ターン制RPG。仲間を集め、強化とアイテム合成で50階層のダンジョンに挑もう。オートバトル・放置成長・ランキングにも対応。">
   <meta name="theme-color" content="#151823">
 
   <!-- Google Search Console のサイト所有権の確認用（消さないでください） -->
@@ -22,25 +22,25 @@
   <!-- SNSで共有したときの表示（OGP） -->
   <!-- ※ og:image と og:url は公開先のURLが決まったら「https://〜」から始まる絶対URLに書き換えてください -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="ターン制バトル">
-  <meta property="og:title" content="ターン制バトル｜50階層ダンジョンRPG">
-  <meta property="og:description" content="仲間を集め、強化とアイテム合成で50階層のダンジョンに挑むブラウザRPG。到達階層ランキングで競おう。">
+  <meta property="og:site_name" content="ゆーるぴーじー">
+  <meta property="og:title" content="ゆーるぴーじー｜ブラウザで遊べる放置ターン制RPG">
+  <meta property="og:description" content="ゆーるぴーじー：仲間を集め、強化とアイテム合成で50階層のダンジョンに挑む放置ターン制RPG。到達階層ランキングで競おう。">
   <meta property="og:image" content="characters/hero.png">
   <!-- 公開URLが決まったら追加： <meta property="og:url" content="https://（公開先のURL）/"> -->
   <meta property="og:locale" content="ja_JP">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="ターン制バトル｜50階層ダンジョンRPG">
-  <meta name="twitter:description" content="仲間を集め、強化とアイテム合成で50階層のダンジョンに挑むブラウザRPG。">
+  <meta name="twitter:title" content="ゆーるぴーじー｜ブラウザで遊べる放置ターン制RPG">
+  <meta name="twitter:description" content="ゆーるぴーじー：仲間を集め、強化とアイテム合成で50階層のダンジョンに挑む放置ターン制RPG。">
   <meta name="twitter:image" content="characters/hero.png">
 
-  <link rel="stylesheet" href="style.css?v=202610090956">
+  <link rel="stylesheet" href="style.css?v=202610091510">
 </head>
 <body>
   <!-- ゲーム画面（960×540 の16:9。screen.js が画面サイズに合わせて拡大縮小する） -->
   <div id="stage">
     <header>
       <div class="header-left">
-        <h1>ターン制バトル</h1>
+        <h1>ゆーるぴーじー</h1>
         <div class="header-status">
           <!-- 現在の階／最高到達階 -->
           <div id="floor-status"></div>
@@ -72,6 +72,8 @@
               <button id="auto-btn">オート：OFF</button>
               <span>速度：</span>
               <span id="speed-buttons"></span>
+              <!-- 諦める（誤タップしにくいよう、小さく目立たない色。押すと確認が出る） -->
+              <button id="giveup-btn" type="button" title="諦めてチェックポイントに戻る">🏳 諦める</button>
             </div>
 
             <!-- 敵 -->
@@ -168,21 +170,24 @@
 
     <!-- 説明の吹き出し（アイコンをタップしたとき・お知らせ） -->
     <div id="toast"></div>
+
+    <!-- スキルの説明の吹き出し（PCはマウスを乗せる、スマホは長押し） -->
+    <div id="skill-tip"></div>
   </div><!-- /#stage -->
 
   <!-- ?v= の数字は版番号。ファイルを更新したら数字を変えると、ブラウザが古いファイルを使わずに読み込み直す -->
   <!-- 読み込み順：画面 → データ → 成長要素・ダンジョン → パネル → クラウド → 詳細・🎒・設定 → バトル・起動 -->
-  <script src="screen.js?v=202610090956"></script>
-  <script src="data.js?v=202610090956"></script>
-  <script src="items.js?v=202610090956"></script>
-  <script src="progress.js?v=202610090956"></script>
-  <script src="dungeon.js?v=202610090956"></script>
-  <script src="panel.js?v=202610090956"></script>
-  <script src="firebase-config.js?v=202610090956"></script>
-  <script src="cloud.js?v=202610090956"></script>
-  <script src="overlay.js?v=202610090956"></script>
-  <script src="zukan.js?v=202610090956"></script>
-  <script src="effects.js?v=202610090956"></script>
-  <script src="main.js?v=202610090956"></script>
+  <script src="screen.js?v=202610091510"></script>
+  <script src="data.js?v=202610091510"></script>
+  <script src="items.js?v=202610091510"></script>
+  <script src="progress.js?v=202610091510"></script>
+  <script src="dungeon.js?v=202610091510"></script>
+  <script src="panel.js?v=202610091510"></script>
+  <script src="firebase-config.js?v=202610091510"></script>
+  <script src="cloud.js?v=202610091510"></script>
+  <script src="overlay.js?v=202610091510"></script>
+  <script src="zukan.js?v=202610091510"></script>
+  <script src="effects.js?v=202610091510"></script>
+  <script src="main.js?v=202610091510"></script>
 </body>
 </html>

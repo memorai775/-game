@@ -1562,6 +1562,14 @@ class Battle {
     return false;
   }
 
+  // 諦める：全滅と同じ扱いでチェックポイントへ戻る（獲得済みの経験値・アイテムはそのまま）
+  giveUp() {
+    if (this.over) return;
+    this.gaveUp = true;
+    this.log('諦めて撤退した…', 'system');
+    this.finish(false);
+  }
+
   finish(win) {
     Watchdog.tick();
     this.over = true;
@@ -1602,6 +1610,7 @@ const UI = {
     result:   document.getElementById('result'),
     log:      document.getElementById('log'),
     status:   document.getElementById('global-status'),
+    tip:      document.getElementById('skill-tip'),
   },
 
   // 表示を更新する（カードは作り直さないので、再生中のアニメーションは途切れない）
@@ -1764,6 +1773,7 @@ const UI = {
 
   // コマンド欄をクリア（プレビューも終了）
   clearCommands() {
+    this.hideTip();
     this.el.cmdBtns.innerHTML = '';
     this.el.desc.textContent = '';
     OrderList.preview = null;
@@ -1771,11 +1781,19 @@ const UI = {
 
   // コマンドボタンを追加
   // getPreview: マウスを乗せたときに行動順プレビューを作る関数（省略可）
-  addButton(label, onClick, disabled = false, desc = '', getPreview = null) {
+  // tip: 吹き出しに出す説明（HTML。PC はマウスを乗せる、スマホは長押しで出る）
+  addButton(label, onClick, disabled = false, desc = '', getPreview = null, tip = '') {
     const btn = document.createElement('button');
     btn.textContent = label;
     btn.disabled = disabled;
-    btn.addEventListener('click', onClick);
+    // 長押しで説明を出したときは、指を離しても技は使わない
+    let longPressed = false;
+    let pressTimer = null;
+    btn.addEventListener('click', e => {
+      if (longPressed) { longPressed = false; e.preventDefault(); return; }
+      this.hideTip();
+      onClick();
+    });
     const enter = () => {
       if (desc) this.el.desc.textContent = desc;
       if (getPreview) this.setPreview(getPreview());
@@ -1787,6 +1805,32 @@ const UI = {
     btn.addEventListener('focus', enter);
     btn.addEventListener('mouseleave', leave);
     btn.addEventListener('blur', leave);
+    if (tip) {
+      // PC：マウスを乗せると吹き出し
+      btn.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') this.showTip(btn, tip); });
+      btn.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') this.hideTip(); });
+      // スマホ：長押し（0.45秒）で吹き出し。指を離すと少しして消える
+      btn.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse') return;
+        longPressed = false;
+        clearTimeout(pressTimer);
+        pressTimer = setTimeout(() => { longPressed = true; this.showTip(btn, tip); enter(); }, 450);
+      });
+      const release = () => {
+        clearTimeout(pressTimer);
+        if (longPressed) setTimeout(() => this.hideTip(), 1500);
+      };
+      btn.addEventListener('pointerup', release);
+      btn.addEventListener('pointercancel', release);
+      btn.addEventListener('contextmenu', e => e.preventDefault()); // 長押しメニューを出さない
+      // 押せない（使用済みなど）ボタンでも説明は見られるようにする
+      if (disabled) {
+        btn.disabled = false;
+        btn.classList.add('is-disabled');
+        btn.setAttribute('aria-disabled', 'true');
+        onClick = () => {};
+      }
+    }
     this.el.cmdBtns.appendChild(btn);
   },
 
@@ -1821,7 +1865,8 @@ const UI = {
         } else {
           this.execute(b, actor, id, b.autoTargets(actor, skill));
         }
-      }, !b.canUse(actor, id), skill.desc, () => b.previewEntries(actor, id, previewTargets(), n));
+      }, !b.canUse(actor, id), `${skillDescText(skill)}（${skillLimitText(skill)}）`,
+      () => b.previewEntries(actor, id, previewTargets(), n), skillTipHtml(skill));
     }
     if (battle === b) OrderList.render(b);
   },
@@ -1911,7 +1956,8 @@ const UI = {
       this.popup(`
         ${t.image ? `<img class="popup-portrait" src="${t.image}" alt="${t.name}">` : ''}
         <p class="popup-title">${t.name}が仲間になった！</p>
-        <p class="popup-note">${note}</p>`);
+        <p class="popup-note">${note}</p>
+        <div class="popup-skills"><div class="popup-skills-title">スキル</div>${skillListHtml(id)}</div>`);
       if (battle) battle.log(`${t.name}が仲間になった！`, 'system');
     }
     if (joined.length) Panel.refresh();
@@ -1955,8 +2001,42 @@ const UI = {
       this.popupQueue.shift();
       this.showNextPopup();
     });
+    // 諦める（確認してから。ボス戦中も使える）
+    document.getElementById('giveup-btn').addEventListener('click', () => {
+      const b = battle;
+      if (!b || b.over) return;
+      if (!confirm(`諦めてチェックポイント（${gameState.checkpoint}階）に戻りますか？`)) return;
+      if (battle === b && !b.over) b.giveUp(); // 確認している間に戦闘が終わっていたら何もしない
+    });
+  },
+
+  // スキルの説明の吹き出し（PC はマウスを乗せる、スマホは長押しで出る）
+  showTip(btn, html) {
+    const tip = this.el.tip;
+    tip.innerHTML = html;
+    tip.classList.add('show');
+    // ボタンの真上に出す（#stage は拡大縮小されているので、その倍率で割って位置を出す）
+    const stageRect = document.getElementById('stage').getBoundingClientRect();
+    const r = btn.getBoundingClientRect();
+    const scale = stageRect.width / document.getElementById('stage').offsetWidth || 1;
+    const stageW = document.getElementById('stage').offsetWidth;
+    const w = tip.offsetWidth;
+    let left = (r.left + r.width / 2 - stageRect.left) / scale - w / 2;
+    left = Math.max(6, Math.min(stageW - w - 6, left));
+    let top = (r.top - stageRect.top) / scale - tip.offsetHeight - 8;
+    if (top < 6) top = (r.bottom - stageRect.top) / scale + 8; // 上に入らなければ下に出す
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  },
+  hideTip() {
+    this.el.tip.classList.remove('show');
   },
 };
+
+// スキルの説明（吹き出し用）：名前・使用制限・効果
+function skillTipHtml(skill) {
+  return `<b>${skill.name}</b><span class="tip-limit">${skillLimitText(skill)}</span><br>${skillDescText(skill)}`;
+}
 
 // ---------------------------------------------------------------------
 // 行動順リスト（バトル画面の右側）
@@ -2257,8 +2337,12 @@ function onBattleEnd(b, win) {
   } else {
     returnToCheckpoint();
     allyHp = {}; // 全員満タンでやり直し
-    b.log('全滅してしまった…', 'system');
-    UI.showResult(false, '全滅…', `${gameState.checkpoint}階からやり直します…`);
+    if (b.gaveUp) {
+      UI.showResult(false, '撤退…', `${gameState.checkpoint}階からやり直します…`);
+    } else {
+      b.log('全滅してしまった…', 'system');
+      UI.showResult(false, '全滅…', `${gameState.checkpoint}階からやり直します…`);
+    }
   }
   UI.renderHeader();
   Panel.refresh(); // ポイントや報酬が増えたので、開いているパネルを更新
@@ -2288,11 +2372,12 @@ function restartFromScratch() {
 // ---------------------------------------------------------------------
 const HOWTO_HTML = `
   <div class="howto">
+    <div class="howto-logo">ゆーるぴーじー</div>
     <h3>⚔ 遊び方</h3>
     <ol>
       <li><b>ダンジョンを1階ずつ進もう。</b>敵を全滅させると次の階へ。10階ごとにボスがいて、全滅すると最後に倒したボスの階に戻ります。</li>
       <li><b>速いキャラほどたくさん行動。</b>キャラの下の「⏱ ○番目」と「行動順」タブで、これからの順番と敵の大技の予告「⚠」が見られます。<b>キャラをタップ</b>すると攻撃・防御・速さやバフの詳細が開きます。</li>
-      <li><b>味方の番に技を選ぼう。</b>「オート」をONにすると味方も自動で戦います。×2・×4で戦闘が速くなります。</li>
+      <li><b>味方の番に技を選ぼう。</b>技のボタンを<b>長押し</b>（PCはマウスを乗せる）すると説明が出ます。「オート」をONにすると味方も自動で戦います。×2・×4で戦闘が速くなります。勝てないときは「🏳 諦める」でチェックポイントに戻れます。</li>
       <li><b>「強化」タブ</b>：レベルアップでもらえるポイントで、ステータスや出撃枠を増やせます。戦闘中でも操作できます。</li>
       <li><b>「アイテム」タブ</b>：5階ごとにアイテムを1つ選べます。下級アイテム2つを合成すると上級アイテムに。いらないアイテムは<b>🎒ボタン</b>で経験値に変換できます。</li>
       <li><b>閉じている間も成長。</b>次に開いたとき、離れていた時間に応じて経験値がもらえます（最大8時間）。進行は自動で保存されます。</li>
@@ -2305,6 +2390,7 @@ let toastTimer = null;
 document.addEventListener('click', e => {
   const el = e.target.closest('.trait-icon, .sbadge, .item-icon, .kiwami');
   if (!el || !el.title) return;
+  if (el.closest('.inv-grid, .equip-picker')) return; // 所持品・装備の選択は、その場に説明が出るので不要
   const toast = document.getElementById('toast');
   toast.textContent = el.title;
   toast.classList.add('show');
