@@ -30,6 +30,7 @@ function createUnit(template, side, name, stats = null, level = 1) {
     image: template.image || null, // 立ち絵
     face: template.face || '50% 0%',          // 行動順リストの顔アイコンの切り抜き位置
     idle: template.idle || 'idle-breath',     // 待機アニメーションのクラス名
+    attackEffect: template.attackEffect || null, // 通常攻撃のエフェクト（effects.js）
     size: template.size || null,              // 'small' なら小さく表示
     intent: null,        // 敵が次に使う予定の技（行動順リストで予告する）
     enrageBelow: template.enrageBelow || null, // 怒りの見た目になるHP割合
@@ -185,6 +186,9 @@ function applyStatus(b, target, id, value, turns) {
   if (!target.alive) return;
   target.statuses = target.statuses.filter(s => s.id !== id); // 同じ状態異常はかけ直し
   target.statuses.push({ id, value, turns });
+  // 状態異常のエフェクト（今の技のエフェクトと同じなら重ねない）
+  const fx = Fx.forStatus(id);
+  if (fx !== b.currentFx) Fx.play(fx, [target]);
   const info = STATUS_INFO[id];
   b.log(`${target.name}${info.applyText}`, 'info');
 }
@@ -305,6 +309,9 @@ function strike(b, user, target, opts = {}) {
   b.log(`${opts.label || ''}${crit ? '会心の一撃！ ' : ''}${target.name}に ${dmg} のダメージ！${target.guarding ? '（防御）' : ''}`, 'damage');
   b.track(Anim.hit(target));
   Anim.number(target, dmg, crit ? 'dmg crit' : 'dmg');
+  // エフェクト（攻撃の種類ごと）と、会心のときの追加演出
+  if (opts.fx) Fx.play(opts.fx, [target], user);
+  if (crit) Fx.crit(target);
   if (result.endured) b.log(`${target.name}は不屈の力でHP1で踏みとどまった！`, 'system');
   user.dealtDamage = true;
   if (target.hp === 0) b.defeat(target, user);
@@ -411,6 +418,7 @@ const EFFECT_HANDLERS = {
       isCounter: !!eff.isCounter,
       magic: !!(skill && skill.magic), // 魔法の技（霊体に軽減されない）
       sureCritBelow: eff.sureCritBelow, // 狙い撃ち
+      fx: b.currentFx,                  // エフェクト
     };
     const hits = eff.hits || 1;
     for (let i = 0; i < hits && target.alive && user.alive; i++) strike(b, user, target, opts);
@@ -478,7 +486,7 @@ const EFFECT_HANDLERS = {
     for (let i = 0; i < eff.count && user.alive; i++) {
       const opp = b.opponentsOf(user);
       if (opp.length === 0) break;
-      strike(b, user, opp[Math.floor(Math.random() * opp.length)], { power: eff.power * b.skillMult, isSkill: true, aoe: true });
+      strike(b, user, opp[Math.floor(Math.random() * opp.length)], { power: eff.power * b.skillMult, isSkill: true, aoe: true, fx: b.currentFx });
     }
   },
 
@@ -516,7 +524,7 @@ const EFFECT_HANDLERS = {
     const ki = user.ki;
     if (ki <= 0) return;
     b.log(`${user.name}は気を${ki}つ解き放った！`, 'system');
-    strike(b, user, target, { power: ki * eff.per * b.skillMult, isSkill: true });
+    strike(b, user, target, { power: ki * eff.per * b.skillMult, isSkill: true, fx: b.currentFx });
     user.ki = 0;
   },
 
@@ -793,6 +801,7 @@ class Battle {
     this.counters = [];      // この行動のあとに行う反撃 [{ by, to }]
     this.skillId = null;     // 今使っているスキル
     this.skillMult = 1;      // 今のスキルの効果倍率（魔力集中で2倍）
+    this.currentFx = null;   // 今のスキルのエフェクト（effects.js）
     this.stolen = false;     // 盗賊の「盗む」が成功したか（この階のクリア時にアイテム選択+1回）
     this.over = false;
     this.turnCount = 0;
@@ -1018,7 +1027,7 @@ class Battle {
       this.tickStatuses(actor);
       this.turnStartItems(actor);
       const regen = trait(actor, 'regen');
-      if (regen) restoreHp(this, actor, actor.base.hp * regen.value, '（再生）');
+      if (regen && restoreHp(this, actor, actor.base.hp * regen.value, '（再生）') > 0) Fx.play('fx_heal', [actor]);
       if (actor.countdown) {
         actor.countdown.turns--;
         if (actor.countdown.turns <= 0) {
@@ -1249,6 +1258,12 @@ class Battle {
     if (battle !== this) return; // 途中でやり直しになった
     if (skill.shake) this.track(Anim.shakeScreen());
 
+    // エフェクト：攻撃なら当たった相手ごとに（strike の中で）、それ以外は対象全員にここで出す
+    this.currentFx = Fx.forSkill(user, skillId);
+    if (this.currentFx && !isAttack) {
+      Fx.play(this.currentFx, skill.target === 'self' ? [user] : targets, user);
+    }
+
     for (const eff of skill.effects) {
       const handler = EFFECT_HANDLERS[eff.type];
       if (!handler) { console.warn('未定義の効果:', eff.type); continue; }
@@ -1263,6 +1278,7 @@ class Battle {
       }
     }
     this.skillMult = 1;
+    this.currentFx = null;
     UI.render(this);
 
     if (isAttack) this.track(Anim.stepOut(user));
@@ -1276,8 +1292,10 @@ class Battle {
       if (!by.alive || !to.alive) continue;
       this.log(`${by.name}の反撃！`, 'info');
       this.skillId = 'attack';
+      this.currentFx = Fx.forSkill(by, 'attack');
       await Anim.stepIn(by);
       EFFECT_HANDLERS.damage(this, by, to, { type: 'damage', power: 1, isCounter: true });
+      this.currentFx = null;
       UI.render(this);
       this.track(Anim.stepOut(by));
       await this.flush();
@@ -1289,6 +1307,7 @@ class Battle {
     if (sd && user.alive && user.actCount + 1 >= sd.after) {
       this.log(`${user.name}は自爆した！`, 'system');
       this.track(Anim.shakeScreen());
+      Fx.play('fx_explosion', [user]);
       user.hp = 0;
       this.defeat(user, null);
       UI.render(this);
@@ -1341,7 +1360,7 @@ class Battle {
       for (const t of this.opponentsOf(unit)) {
         strike(this, unit, t, {
           power: blast.power, aoe: true, unavoidable: true, noCrit: true,
-          noRedirect: true, noReflect: true, secondary: true, isCounter: true, label: '爆炎！ ',
+          noRedirect: true, noReflect: true, secondary: true, isCounter: true, label: '爆炎！ ', fx: 'fx_explosion',
         });
       }
     }
@@ -2103,11 +2122,31 @@ function startFloor() {
 
 // エリアの背景と名前（エリアが変わったときは大きく表示）
 let shownArea = null;
+let shownBg = null;
 function showArea(floor) {
   const area = areaOf(floor);
   const main = document.getElementById('battle-main');
-  main.style.background = area.bg;
+  main.style.background = area.bg; // 画像を読み込むまでの下地
   main.style.setProperty('--area-text', area.text);
+
+  // 背景画像：変わったときだけ、新しい背景を上に重ねて1秒でフェード（古いほうは後で消す）
+  const image = backgroundOf(floor);
+  const layers = document.getElementById('bg-layers');
+  if (image !== shownBg) {
+    shownBg = image;
+    const layer = document.createElement('div');
+    layer.className = 'bg-layer';
+    if (image) layer.style.backgroundImage = `url("${image}")`;
+    layers.appendChild(layer);
+    void layer.offsetWidth;
+    layer.classList.add('show');
+    const old = [...layers.children].filter(l => l !== layer);
+    setTimeout(() => old.forEach(l => l.remove()), 1100);
+  }
+  // ボス戦は背景を少し暗くして赤みを足す
+  layers.classList.toggle('boss', isBossFloor(floor));
+
+  // エリアが変わったら、エリア名を画面中央に大きく出してから消す
   if (shownArea === area.name) return;
   shownArea = area.name;
   const banner = document.createElement('div');
