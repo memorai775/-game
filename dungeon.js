@@ -29,6 +29,16 @@ function areaOf(floor) {
   return list[list.length - 1];
 }
 
+// その階の背景画像（無限モードは5枚を10階ごとに順番に：51〜60階が1枚目、61〜70階が2枚目…）
+function backgroundOf(floor) {
+  const area = areaOf(floor);
+  if (area.images && area.images.length) {
+    const n = Math.floor((floor - area.from) / DUNGEON.bossEvery);
+    return area.images[n % area.images.length];
+  }
+  return area.image || null;
+}
+
 // その階で使う出現表（無限モードでは全部）
 function poolsFor(floor) {
   if (isEndless(floor)) return DUNGEON.enemyPools;

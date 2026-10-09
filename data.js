@@ -72,90 +72,90 @@ const ENEMY_TYPE_LABELS = {
 const SKILLS = {
   // --- 共通 ---
   attack:     { name: '攻撃', target: 'enemy', desc: '敵1体に通常攻撃', effects: [{ type: 'damage', power: 1.0 }] },
-  defend:     { name: '防御', target: 'self', desc: '次の行動まで受けるダメージ半減', effects: [{ type: 'guard' }] },
+  defend:     { name: '防御', effect: 'fx_shield', target: 'self', desc: '次の行動まで受けるダメージ半減', effects: [{ type: 'guard' }] },
 
   // --- 主人公用 ---
-  heavySlash: { name: '強斬り', target: 'enemy', cooldown: 3, desc: '敵1体に1.8倍ダメージ（使用後3ターン使用不可）', effects: [{ type: 'damage', power: 1.8 }] },
-  legSweep:   { name: '足払い', target: 'enemy', cooldown: 3, desc: '敵1体に0.6倍ダメージ＋行動を大きく遅らせる', effects: [{ type: 'damage', power: 0.6 }, { type: 'delay', amount: 0.6 }] },
-  firstAid:   { name: '応急手当', target: 'self', cooldown: 4, desc: '自分の最大HPの35%回復', effects: [{ type: 'heal', ratio: 0.35 }] },
-  quicken:    { name: '加速', target: 'self', cooldown: 5, desc: '3ターンの間 速度1.5倍', effects: [{ type: 'buff', stat: 'spd', rate: 1.5, turns: 3 }] },
+  heavySlash: { name: '強斬り', effect: 'fx_slash', target: 'enemy', cooldown: 3, desc: '敵1体に1.8倍ダメージ（使用後3ターン使用不可）', effects: [{ type: 'damage', power: 1.8 }] },
+  legSweep:   { name: '足払い', effect: 'fx_impact', target: 'enemy', cooldown: 3, desc: '敵1体に0.6倍ダメージ＋行動を大きく遅らせる', effects: [{ type: 'damage', power: 0.6 }, { type: 'delay', amount: 0.6 }] },
+  firstAid:   { name: '応急手当', effect: 'fx_heal', target: 'self', cooldown: 4, desc: '自分の最大HPの35%回復', effects: [{ type: 'heal', ratio: 0.35 }] },
+  quicken:    { name: '加速', effect: 'fx_buff', target: 'self', cooldown: 5, desc: '3ターンの間 速度1.5倍', effects: [{ type: 'buff', stat: 'spd', rate: 1.5, turns: 3 }] },
 
   // --- 騎士・僧侶用 ---
-  cover:      { name: 'かばう', target: 'ally', cooldown: 2, desc: '味方1体をかばう（次の自分の行動まで代わりに攻撃を受ける）＋自分は防御', effects: [{ type: 'cover' }, { type: 'guard', target: 'self' }] },
-  heal:       { name: '回復', target: 'ally', desc: '味方1体のHPを35%回復', effects: [{ type: 'heal', ratio: 0.35 }] },
-  healAll:    { name: '全体回復', target: 'allAllies', cooldown: 2, desc: '味方全員のHPを25%回復', effects: [{ type: 'heal', ratio: 0.25 }] },
+  cover:      { name: 'かばう', effect: 'fx_shield', target: 'ally', cooldown: 2, desc: '味方1体をかばう（次の自分の行動まで代わりに攻撃を受ける）＋自分は防御', effects: [{ type: 'cover' }, { type: 'guard', target: 'self' }] },
+  heal:       { name: '回復', effect: 'fx_heal', target: 'ally', desc: '味方1体のHPを35%回復', effects: [{ type: 'heal', ratio: 0.35 }] },
+  healAll:    { name: '全体回復', effect: 'fx_heal', target: 'allAllies', cooldown: 2, desc: '味方全員のHPを25%回復', effects: [{ type: 'heal', ratio: 0.25 }] },
 
   // --- 敵用 ---
-  doubleBite: { name: '連続かみつき', target: 'enemy', desc: '0.6倍ダメージ×2回', effects: [{ type: 'damage', power: 0.6, hits: 2 }] },
-  harden:     { name: 'かたくなる', target: 'self', cooldown: 3, desc: '防御2倍（3ターン）', effects: [{ type: 'buff', stat: 'def', rate: 2.0, turns: 3 }] },
-  charge:     { name: '力をためる', target: 'self', desc: '次の行動まで攻撃2倍', effects: [{ type: 'buff', stat: 'atk', rate: 2.0, turns: 1, tag: 'charge' }] },
-  heavyBlow:  { name: '渾身の一撃', target: 'enemy', danger: true, desc: '1.5倍ダメージ', effects: [{ type: 'damage', power: 1.5 }] },
-  slowCurse:  { name: '鈍足の呪い', target: 'enemy', cooldown: 3, desc: '速度0.6倍（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 0.6, turns: 3 }] },
-  shadowBind: { name: '影しばり', target: 'enemy', cooldown: 2, desc: '0.5倍ダメージ＋行動を遅らせる', effects: [{ type: 'damage', power: 0.5 }, { type: 'delay', amount: 0.4 }] },
-  healAlly:   { name: 'いやしの花粉', target: 'ally', cooldown: 1, desc: '仲間1体のHPを30%回復', effects: [{ type: 'heal', ratio: 0.3 }] },
-  roar:       { name: '怒りの咆哮', target: 'self', desc: '攻撃1.3倍・速度1.2倍（長時間）', effects: [{ type: 'buff', stat: 'atk', rate: 1.3, turns: 99 }, { type: 'buff', stat: 'spd', rate: 1.2, turns: 99 }] },
-  quake:      { name: '大地震', target: 'allEnemies', cooldown: 3, shake: true, danger: true, desc: '相手全員に1.2倍ダメージ＋行動を遅らせる', effects: [{ type: 'damage', power: 1.2 }, { type: 'delay', amount: 0.3 }] },
+  doubleBite: { name: '連続かみつき', effect: 'fx_impact', target: 'enemy', desc: '0.6倍ダメージ×2回', effects: [{ type: 'damage', power: 0.6, hits: 2 }] },
+  harden:     { name: 'かたくなる', effect: 'fx_shield', target: 'self', cooldown: 3, desc: '防御2倍（3ターン）', effects: [{ type: 'buff', stat: 'def', rate: 2.0, turns: 3 }] },
+  charge:     { name: '力をためる', effect: 'fx_buff', target: 'self', desc: '次の行動まで攻撃2倍', effects: [{ type: 'buff', stat: 'atk', rate: 2.0, turns: 1, tag: 'charge' }] },
+  heavyBlow:  { name: '渾身の一撃', effect: 'fx_impact', target: 'enemy', danger: true, desc: '1.5倍ダメージ', effects: [{ type: 'damage', power: 1.5 }] },
+  slowCurse:  { name: '鈍足の呪い', effect: 'fx_debuff', target: 'enemy', cooldown: 3, desc: '速度0.6倍（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 0.6, turns: 3 }] },
+  shadowBind: { name: '影しばり', effect: 'fx_dark', target: 'enemy', cooldown: 2, desc: '0.5倍ダメージ＋行動を遅らせる', effects: [{ type: 'damage', power: 0.5 }, { type: 'delay', amount: 0.4 }] },
+  healAlly:   { name: 'いやしの花粉', effect: 'fx_heal', target: 'ally', cooldown: 1, desc: '仲間1体のHPを30%回復', effects: [{ type: 'heal', ratio: 0.3 }] },
+  roar:       { name: '怒りの咆哮', effect: 'fx_buff', target: 'self', desc: '攻撃1.3倍・速度1.2倍（長時間）', effects: [{ type: 'buff', stat: 'atk', rate: 1.3, turns: 99 }, { type: 'buff', stat: 'spd', rate: 1.2, turns: 99 }] },
+  quake:      { name: '大地震', effect: 'fx_explosion', target: 'allEnemies', cooldown: 3, shake: true, danger: true, desc: '相手全員に1.2倍ダメージ＋行動を遅らせる', effects: [{ type: 'damage', power: 1.2 }, { type: 'delay', amount: 0.3 }] },
 
   // --- 深淵の竜王 ---
-  dragonBite:  { name: 'かみつき',   target: 'enemy', desc: '1.1倍ダメージ', effects: [{ type: 'damage', power: 1.1 }] },
-  fireBreath:  { name: '炎のブレス', target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に0.8倍ダメージ＋やけど（毎ターン3%、2ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
-  soar:        { name: '飛翔',       target: 'self', cooldown: 3, desc: '2ターンの間 回避50%', effects: [{ type: 'status', status: 'flying', value: 0.5, turns: 2 }] },
-  dive:        { name: '急降下',     target: 'enemy', danger: true, desc: '2.5倍ダメージ', effects: [{ type: 'damage', power: 2.5 }] },
-  abyssCharge: { name: '深淵の胎動', target: 'self', cooldown: 6, desc: '3ターン後に「深淵の炎」を放つ', effects: [{ type: 'countdown', skill: 'abyssFlame', turns: 3 }] },
-  abyssFlame:  { name: '深淵の炎',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に3倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 3.0 }] },
+  dragonBite:  { name: 'かみつき', effect: 'fx_impact',   target: 'enemy', desc: '1.1倍ダメージ', effects: [{ type: 'damage', power: 1.1 }] },
+  fireBreath:  { name: '炎のブレス', effect: 'fx_fire', target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に0.8倍ダメージ＋やけど（毎ターン3%、2ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
+  soar:        { name: '飛翔', effect: 'fx_buff',       target: 'self', cooldown: 3, desc: '2ターンの間 回避50%', effects: [{ type: 'status', status: 'flying', value: 0.5, turns: 2 }] },
+  dive:        { name: '急降下', effect: 'fx_impact',     target: 'enemy', danger: true, desc: '2.5倍ダメージ', effects: [{ type: 'damage', power: 2.5 }] },
+  abyssCharge: { name: '深淵の胎動', effect: 'fx_dark', target: 'self', cooldown: 6, desc: '3ターン後に「深淵の炎」を放つ', effects: [{ type: 'countdown', skill: 'abyssFlame', turns: 3 }] },
+  abyssFlame:  { name: '深淵の炎', effect: 'fx_explosion',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に3倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 3.0 }] },
 
   // --- 15階以降に加入する仲間 ---
   // oncePerBattle: 1戦闘1回（ボタンに「使用済み」と出る） / needsKi: 気がないと使えない
-  twinSlash:    { name: '二刀斬り',     target: 'enemy', desc: '敵1体に0.7倍×2回', effects: [{ type: 'damage', power: 0.7, hits: 2 }] },
-  shadowStitch: { name: '影縫い',       target: 'enemy', cooldown: 2, desc: '敵1体の行動ゲージ-40%', effects: [{ type: 'delay', amount: 0.4 }] },
-  steal:        { name: '盗む',         target: 'enemy', oncePerBattle: true, desc: '攻撃＋30%で盗む（成功するとこの階のクリア時にアイテムを1回多く選べる）。1戦闘1回', effects: [{ type: 'damage', power: 1.0 }, { type: 'steal', chance: 0.3 }] },
-  fireball:     { name: '火球',         target: 'enemy', magic: true, desc: '敵1体に1.4倍ダメージ', effects: [{ type: 'damage', power: 1.4 }] },
-  inferno:      { name: '爆炎',         target: 'allEnemies', cooldown: 2, magic: true, shake: true, desc: '敵全体に0.8倍ダメージ＋やけど（2ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
-  focus:        { name: '魔力集中',     target: 'self', cooldown: 3, desc: '次のスキルの効果2倍＋行動ゲージ+30%', effects: [{ type: 'status', status: 'focus', turns: 99 }, { type: 'gaugeAfter', amount: 0.3 }] },
-  aimedShot:    { name: '狙い撃ち',     target: 'weakestEnemy', desc: 'HPが一番低い敵に1.2倍ダメージ。HP30%以下の敵には必ず会心', effects: [{ type: 'damage', power: 1.2, sureCritBelow: 0.3 }] },
-  pinningArrow: { name: '足止めの矢',   target: 'enemy', cooldown: 2, desc: '敵1体に0.9倍ダメージ＋速度-20%（3ターン）', effects: [{ type: 'damage', power: 0.9 }, { type: 'buff', stat: 'spd', rate: 0.8, turns: 3 }] },
-  volley:       { name: '連射',         target: 'self', desc: 'ランダムな敵に0.5倍×4回', effects: [{ type: 'damageRandom', power: 0.5, count: 4 }] },
-  windSong:     { name: '疾風の歌',     target: 'allAllies', cooldown: 2, desc: '味方全員の速度+20%（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 1.2, turns: 3, tag: 'song_wind' }] },
-  braveSong:    { name: '勇気の歌',     target: 'allAllies', cooldown: 2, desc: '味方全員の攻撃+20%（3ターン）', effects: [{ type: 'buff', stat: 'atk', rate: 1.2, turns: 3, tag: 'song_brave' }] },
-  lullaby:      { name: '子守唄',       target: 'enemy', cooldown: 3, desc: '敵1体を眠らせる（行動ゲージ0＋1回休み。ボスには半分の効果）', effects: [{ type: 'sleep' }] },
-  comboStrike:  { name: '連撃',         target: 'enemy', desc: '敵1体に0.6倍×3回', effects: [{ type: 'damage', power: 0.6, hits: 3 }] },
-  hyakuretsu:   { name: '奥義・百烈拳', target: 'enemy', needsKi: true, danger: true, desc: '気を全部使い、気の数×0.8倍のダメージ', effects: [{ type: 'kiBurst', per: 0.8 }] },
-  stance:       { name: '構え',         target: 'self', cooldown: 2, desc: '次に受ける攻撃に反撃する', effects: [{ type: 'status', status: 'counterStance', turns: 1 }] },
-  timeHaste:    { name: '加速',         target: 'ally', cooldown: 1, desc: '味方1人の行動ゲージを満タンにする（すぐ行動）', effects: [{ type: 'fillGauge' }] },
-  timeStop:     { name: '時間停止',     target: 'allEnemies', cooldown: 3, desc: '敵全員の行動ゲージ-50%（4ターンに1回）', effects: [{ type: 'delay', amount: 0.5 }] },
-  rewind:       { name: '巻き戻し',     target: 'ally', oncePerBattle: true, desc: '味方1人のHPを3ターン前の値に戻す（1戦闘1回）', effects: [{ type: 'rewind', turns: 3 }] },
+  twinSlash:    { name: '二刀斬り', effect: 'fx_slash',     target: 'enemy', desc: '敵1体に0.7倍×2回', effects: [{ type: 'damage', power: 0.7, hits: 2 }] },
+  shadowStitch: { name: '影縫い', effect: 'fx_dark',       target: 'enemy', cooldown: 2, desc: '敵1体の行動ゲージ-40%', effects: [{ type: 'delay', amount: 0.4 }] },
+  steal:        { name: '盗む', effect: 'fx_slash',         target: 'enemy', oncePerBattle: true, desc: '攻撃＋30%で盗む（成功するとこの階のクリア時にアイテムを1回多く選べる）。1戦闘1回', effects: [{ type: 'damage', power: 1.0 }, { type: 'steal', chance: 0.3 }] },
+  fireball:     { name: '火球', effect: 'fx_fire',         target: 'enemy', magic: true, desc: '敵1体に1.4倍ダメージ', effects: [{ type: 'damage', power: 1.4 }] },
+  inferno:      { name: '爆炎', effect: 'fx_explosion',         target: 'allEnemies', cooldown: 2, magic: true, shake: true, desc: '敵全体に0.8倍ダメージ＋やけど（2ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
+  focus:        { name: '魔力集中', effect: 'fx_buff',     target: 'self', cooldown: 3, desc: '次のスキルの効果2倍＋行動ゲージ+30%', effects: [{ type: 'status', status: 'focus', turns: 99 }, { type: 'gaugeAfter', amount: 0.3 }] },
+  aimedShot:    { name: '狙い撃ち', effect: 'fx_arrow',     target: 'weakestEnemy', desc: 'HPが一番低い敵に1.2倍ダメージ。HP30%以下の敵には必ず会心', effects: [{ type: 'damage', power: 1.2, sureCritBelow: 0.3 }] },
+  pinningArrow: { name: '足止めの矢', effect: 'fx_arrow',   target: 'enemy', cooldown: 2, desc: '敵1体に0.9倍ダメージ＋速度-20%（3ターン）', effects: [{ type: 'damage', power: 0.9 }, { type: 'buff', stat: 'spd', rate: 0.8, turns: 3 }] },
+  volley:       { name: '連射', effect: 'fx_arrow',         target: 'self', desc: 'ランダムな敵に0.5倍×4回', effects: [{ type: 'damageRandom', power: 0.5, count: 4 }] },
+  windSong:     { name: '疾風の歌', effect: 'fx_music',     target: 'allAllies', cooldown: 2, desc: '味方全員の速度+20%（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 1.2, turns: 3, tag: 'song_wind' }] },
+  braveSong:    { name: '勇気の歌', effect: 'fx_music',     target: 'allAllies', cooldown: 2, desc: '味方全員の攻撃+20%（3ターン）', effects: [{ type: 'buff', stat: 'atk', rate: 1.2, turns: 3, tag: 'song_brave' }] },
+  lullaby:      { name: '子守唄', effect: 'fx_music',       target: 'enemy', cooldown: 3, desc: '敵1体を眠らせる（行動ゲージ0＋1回休み。ボスには半分の効果）', effects: [{ type: 'sleep' }] },
+  comboStrike:  { name: '連撃', effect: 'fx_impact',         target: 'enemy', desc: '敵1体に0.6倍×3回', effects: [{ type: 'damage', power: 0.6, hits: 3 }] },
+  hyakuretsu:   { name: '奥義・百烈拳', effect: 'fx_impact', target: 'enemy', needsKi: true, danger: true, desc: '気を全部使い、気の数×0.8倍のダメージ', effects: [{ type: 'kiBurst', per: 0.8 }] },
+  stance:       { name: '構え', effect: 'fx_shield',         target: 'self', cooldown: 2, desc: '次に受ける攻撃に反撃する', effects: [{ type: 'status', status: 'counterStance', turns: 1 }] },
+  timeHaste:    { name: '加速', effect: 'fx_time',         target: 'ally', cooldown: 1, desc: '味方1人の行動ゲージを満タンにする（すぐ行動）', effects: [{ type: 'fillGauge' }] },
+  timeStop:     { name: '時間停止', effect: 'fx_time',     target: 'allEnemies', cooldown: 3, desc: '敵全員の行動ゲージ-50%（4ターンに1回）', effects: [{ type: 'delay', amount: 0.5 }] },
+  rewind:       { name: '巻き戻し', effect: 'fx_time',     target: 'ally', oncePerBattle: true, desc: '味方1人のHPを3ターン前の値に戻す（1戦闘1回）', effects: [{ type: 'rewind', turns: 3 }] },
 
   // --- 灼熱の火山（21〜30階） ---
-  flameBreath:   { name: '炎の息',     target: 'enemy', cooldown: 2, desc: '1.2倍ダメージ＋やけど', effects: [{ type: 'damage', power: 1.2 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
-  lavaBurst:     { name: '溶岩噴出',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
-  bombBlast:     { name: '大爆発',     target: 'allEnemies', shake: true, danger: true, desc: '相手全員に4倍ダメージ（自分も倒れる）', effects: [{ type: 'damage', power: 4.0 }, { type: 'selfKill', target: 'self' }] },
-  ashStorm:      { name: '灰の嵐',     target: 'allEnemies', cooldown: 2, desc: '相手全員に0.8倍ダメージ＋仲間の攻撃+20%（3ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'buff', target: 'allAllies', stat: 'atk', rate: 1.2, turns: 3, tag: 'ash' }] },
-  burrow:        { name: '地中に潜る', target: 'self', cooldown: 3, desc: '1ターン攻撃無効、次の行動で飛び出して2倍ダメージ', effects: [{ type: 'status', status: 'burrowed', turns: 1 }, { type: 'queueSkill', skill: 'emerge' }] },
-  emerge:        { name: '飛び出し',   target: 'enemy', danger: true, desc: '2倍ダメージ', effects: [{ type: 'damage', power: 2.0 }] },
-  flameFist:     { name: '炎の拳',     target: 'enemy', desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
-  fireCircle:    { name: '火炎陣',     target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に0.9倍ダメージ＋やけど', effects: [{ type: 'damage', power: 0.9 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
-  eruption:      { name: '大噴火',     target: 'allEnemies', shake: true, danger: true, desc: '相手全員に3倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 3.0 }] },
+  flameBreath:   { name: '炎の息', effect: 'fx_fire',     target: 'enemy', cooldown: 2, desc: '1.2倍ダメージ＋やけど', effects: [{ type: 'damage', power: 1.2 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
+  lavaBurst:     { name: '溶岩噴出', effect: 'fx_explosion',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  bombBlast:     { name: '大爆発', effect: 'fx_explosion',     target: 'allEnemies', shake: true, danger: true, desc: '相手全員に4倍ダメージ（自分も倒れる）', effects: [{ type: 'damage', power: 4.0 }, { type: 'selfKill', target: 'self' }] },
+  ashStorm:      { name: '灰の嵐', effect: 'fx_fire',     target: 'allEnemies', cooldown: 2, desc: '相手全員に0.8倍ダメージ＋仲間の攻撃+20%（3ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'buff', target: 'allAllies', stat: 'atk', rate: 1.2, turns: 3, tag: 'ash' }] },
+  burrow:        { name: '地中に潜る', effect: 'fx_shield', target: 'self', cooldown: 3, desc: '1ターン攻撃無効、次の行動で飛び出して2倍ダメージ', effects: [{ type: 'status', status: 'burrowed', turns: 1 }, { type: 'queueSkill', skill: 'emerge' }] },
+  emerge:        { name: '飛び出し', effect: 'fx_impact',   target: 'enemy', danger: true, desc: '2倍ダメージ', effects: [{ type: 'damage', power: 2.0 }] },
+  flameFist:     { name: '炎の拳', effect: 'fx_fire',     target: 'enemy', desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  fireCircle:    { name: '火炎陣', effect: 'fx_fire',     target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に0.9倍ダメージ＋やけど', effects: [{ type: 'damage', power: 0.9 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
+  eruption:      { name: '大噴火', effect: 'fx_explosion',     target: 'allEnemies', shake: true, danger: true, desc: '相手全員に3倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 3.0 }] },
 
   // --- 深海の神殿（31〜40階） ---
-  charmSong:     { name: '魅了の歌',   target: 'enemy', cooldown: 2, desc: '0.6倍ダメージ＋30%で魅了（1回だけ味方を攻撃）', effects: [{ type: 'damage', power: 0.6 }, { type: 'status', status: 'charm', turns: 1, chance: 0.3 }] },
-  inkSpray:      { name: '墨',         target: 'enemy', cooldown: 4, desc: '0.8倍ダメージ＋墨（3ターン行動順が見えない）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'ink', turns: 3 }] },
-  bigMouth:      { name: '大口',       target: 'enemy', cooldown: 2, danger: true, desc: '2.5倍ダメージ', effects: [{ type: 'damage', power: 2.5 }] },
-  summonSkeleton:{ name: '亡者の号令', target: 'self', cooldown: 4, desc: '骸骨剣士を1体呼ぶ', effects: [{ type: 'summon', enemy: 'skeleton', count: 1 }] },
-  seaBite:       { name: 'かみつき',   target: 'enemy', desc: '1.2倍ダメージ', effects: [{ type: 'damage', power: 1.2 }] },
-  tsunami:       { name: '大津波',     target: 'allEnemies', cooldown: 3, shake: true, desc: '相手全員に1.0倍ダメージ＋行動ゲージ-30%', effects: [{ type: 'damage', power: 1.0 }, { type: 'delay', amount: 0.3 }] },
-  submerge:      { name: '海に潜る',   target: 'self', cooldown: 5, desc: '2ターン攻撃無効 → 浮上して全体攻撃', effects: [{ type: 'status', status: 'submerged', turns: 2 }, { type: 'queueSkill', skill: 'surge' }] },
-  surge:         { name: '浮上の大渦', target: 'allEnemies', shake: true, danger: true, desc: '相手全員に2倍ダメージ', effects: [{ type: 'damage', power: 2.0 }] },
+  charmSong:     { name: '魅了の歌', effect: 'fx_music',   target: 'enemy', cooldown: 2, desc: '0.6倍ダメージ＋30%で魅了（1回だけ味方を攻撃）', effects: [{ type: 'damage', power: 0.6 }, { type: 'status', status: 'charm', turns: 1, chance: 0.3 }] },
+  inkSpray:      { name: '墨', effect: 'fx_dark',         target: 'enemy', cooldown: 4, desc: '0.8倍ダメージ＋墨（3ターン行動順が見えない）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'ink', turns: 3 }] },
+  bigMouth:      { name: '大口', effect: 'fx_impact',       target: 'enemy', cooldown: 2, danger: true, desc: '2.5倍ダメージ', effects: [{ type: 'damage', power: 2.5 }] },
+  summonSkeleton:{ name: '亡者の号令', effect: 'fx_dark', target: 'self', cooldown: 4, desc: '骸骨剣士を1体呼ぶ', effects: [{ type: 'summon', enemy: 'skeleton', count: 1 }] },
+  seaBite:       { name: 'かみつき', effect: 'fx_impact',   target: 'enemy', desc: '1.2倍ダメージ', effects: [{ type: 'damage', power: 1.2 }] },
+  tsunami:       { name: '大津波', effect: 'fx_explosion',     target: 'allEnemies', cooldown: 3, shake: true, desc: '相手全員に1.0倍ダメージ＋行動ゲージ-30%', effects: [{ type: 'damage', power: 1.0 }, { type: 'delay', amount: 0.3 }] },
+  submerge:      { name: '海に潜る', effect: 'fx_shield',   target: 'self', cooldown: 5, desc: '2ターン攻撃無効 → 浮上して全体攻撃', effects: [{ type: 'status', status: 'submerged', turns: 2 }, { type: 'queueSkill', skill: 'surge' }] },
+  surge:         { name: '浮上の大渦', effect: 'fx_explosion', target: 'allEnemies', shake: true, danger: true, desc: '相手全員に2倍ダメージ', effects: [{ type: 'damage', power: 2.0 }] },
 
   // --- 天空の城（41〜50階） ---
-  chainLightning:{ name: '連鎖雷',     target: 'self', cooldown: 2, desc: 'ランダムな相手に0.7倍ダメージ×3回', effects: [{ type: 'damageRandom', power: 0.7, count: 3 }] },
-  resurrect:     { name: '蘇生の祈り', target: 'deadAlly', cooldown: 999, desc: '倒れた仲間1体をHP50%で蘇生（1回だけ）', effects: [{ type: 'revive', ratio: 0.5 }] },
-  griffonDive:   { name: '急降下',     target: 'enemy', cooldown: 2, danger: true, desc: '2倍ダメージ＋相手の行動を一番後ろへ', effects: [{ type: 'damage', power: 2.0 }, { type: 'toBack' }] },
-  poisonTail:    { name: '毒の尾',     target: 'enemy', cooldown: 2, desc: '1.0倍ダメージ＋毒（毎ターン6%、3ターン）', effects: [{ type: 'damage', power: 1.0 }, { type: 'status', status: 'poison', value: 0.06, turns: 3 }] },
-  timeMagic:     { name: '時の魔法',   target: 'allEnemies', cooldown: 4, desc: '相手全員の速度-20%、仲間全員の速度+20%（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 0.8, turns: 3 }, { type: 'buff', target: 'allAllies', stat: 'spd', rate: 1.2, turns: 3 }] },
-  lightSword:    { name: '光の剣',     target: 'enemy', desc: '0.9倍ダメージ×2回', effects: [{ type: 'damage', power: 0.9, hits: 2 }] },
-  skyBarrier:    { name: '天空結界',   target: 'self', cooldown: 6, desc: '3ターン受けるダメージ半減', effects: [{ type: 'status', status: 'barrier', turns: 3 }] },
-  lightRain:     { name: '光の雨',     target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に1.2倍ダメージ', effects: [{ type: 'damage', power: 1.2 }] },
-  endLight:      { name: '終焉の光',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に4倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 4.0 }] },
+  chainLightning:{ name: '連鎖雷', effect: 'fx_thunder',     target: 'self', cooldown: 2, desc: 'ランダムな相手に0.7倍ダメージ×3回', effects: [{ type: 'damageRandom', power: 0.7, count: 3 }] },
+  resurrect:     { name: '蘇生の祈り', effect: 'fx_heal', target: 'deadAlly', cooldown: 999, desc: '倒れた仲間1体をHP50%で蘇生（1回だけ）', effects: [{ type: 'revive', ratio: 0.5 }] },
+  griffonDive:   { name: '急降下', effect: 'fx_impact',     target: 'enemy', cooldown: 2, danger: true, desc: '2倍ダメージ＋相手の行動を一番後ろへ', effects: [{ type: 'damage', power: 2.0 }, { type: 'toBack' }] },
+  poisonTail:    { name: '毒の尾', effect: 'fx_poison',     target: 'enemy', cooldown: 2, desc: '1.0倍ダメージ＋毒（毎ターン6%、3ターン）', effects: [{ type: 'damage', power: 1.0 }, { type: 'status', status: 'poison', value: 0.06, turns: 3 }] },
+  timeMagic:     { name: '時の魔法', effect: 'fx_time',   target: 'allEnemies', cooldown: 4, desc: '相手全員の速度-20%、仲間全員の速度+20%（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 0.8, turns: 3 }, { type: 'buff', target: 'allAllies', stat: 'spd', rate: 1.2, turns: 3 }] },
+  lightSword:    { name: '光の剣', effect: 'fx_slash',     target: 'enemy', desc: '0.9倍ダメージ×2回', effects: [{ type: 'damage', power: 0.9, hits: 2 }] },
+  skyBarrier:    { name: '天空結界', effect: 'fx_shield',   target: 'self', cooldown: 6, desc: '3ターン受けるダメージ半減', effects: [{ type: 'status', status: 'barrier', turns: 3 }] },
+  lightRain:     { name: '光の雨', effect: 'fx_thunder',     target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に1.2倍ダメージ', effects: [{ type: 'damage', power: 1.2 }] },
+  endLight:      { name: '終焉の光', effect: 'fx_explosion',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に4倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 4.0 }] },
 };
 
 // ---------------------------------------------------------------------
@@ -286,7 +286,7 @@ const ELITE = {
 //   加入しても出撃枠に空きが無ければ控え（強化画面で出撃メンバーを入れ替える）
 const CHARACTERS = {
   hero: {
-    name: '主人公', role: 'all', image: 'characters/hero.png', hp: 180, atk: 30, def: 15, spd: 100,
+    name: '主人公', attackEffect: 'fx_slash', role: 'all', image: 'characters/hero.png', hp: 180, atk: 30, def: 15, spd: 100,
     skills: ['attack', 'defend', 'heavySlash', 'legSweep', 'firstAid', 'quicken'],
     autoRules: [
       { skill: 'quicken',    when: { firstTurn: true } },
@@ -296,7 +296,7 @@ const CHARACTERS = {
     ],
   },
   knight: {
-    name: '騎士', role: 'tank', image: 'characters/knight.png', hp: 240, atk: 22, def: 28, spd: 80,
+    name: '騎士', attackEffect: 'fx_slash', role: 'tank', image: 'characters/knight.png', hp: 240, atk: 22, def: 28, spd: 80,
     join: { reachFloor: 5 },
     skills: ['attack', 'defend', 'cover'],
     autoRules: [
@@ -305,7 +305,7 @@ const CHARACTERS = {
     ],
   },
   priest: {
-    name: '僧侶', role: 'healer', image: 'characters/priest.png', hp: 140, atk: 16, def: 12, spd: 110,
+    name: '僧侶', attackEffect: 'fx_impact', role: 'healer', image: 'characters/priest.png', hp: 140, atk: 16, def: 12, spd: 110,
     join: { defeatBoss: 10 },
     skills: ['attack', 'heal', 'healAll'],
     autoRules: [
@@ -317,7 +317,7 @@ const CHARACTERS = {
 
   // ---- 15階以降に加入する仲間 ----
   thief: {
-    name: '盗賊', role: 'speed', image: 'characters/thief.png', hp: 150, atk: 26, def: 12, spd: 140,
+    name: '盗賊', attackEffect: 'fx_slash', role: 'speed', image: 'characters/thief.png', hp: 150, atk: 26, def: 12, spd: 140,
     join: { reachFloor: 15 },
     skills: ['attack', 'defend', 'twinSlash', 'shadowStitch', 'steal'],
     autoRules: [
@@ -326,7 +326,7 @@ const CHARACTERS = {
     ],
   },
   mage: {
-    name: '魔法使い', role: 'aoe', image: 'characters/mage.png', hp: 120, atk: 34, def: 10, spd: 90,
+    name: '魔法使い', attackEffect: 'fx_fire', role: 'aoe', image: 'characters/mage.png', hp: 120, atk: 34, def: 10, spd: 90,
     join: { defeatBoss: 20 },
     skills: ['attack', 'defend', 'fireball', 'inferno', 'focus'],
     autoRules: [
@@ -335,7 +335,7 @@ const CHARACTERS = {
     ],
   },
   archer: {
-    name: '弓使い', role: 'finisher', image: 'characters/archer.png', hp: 140, atk: 30, def: 12, spd: 115,
+    name: '弓使い', attackEffect: 'fx_arrow', role: 'finisher', image: 'characters/archer.png', hp: 140, atk: 30, def: 12, spd: 115,
     join: { reachFloor: 25 },
     skills: ['attack', 'defend', 'aimedShot', 'pinningArrow', 'volley'],
     autoRules: [
@@ -345,7 +345,7 @@ const CHARACTERS = {
     ],
   },
   bard: {
-    name: '吟遊詩人', role: 'buffer', image: 'characters/bard.png', hp: 130, atk: 14, def: 12, spd: 120,
+    name: '吟遊詩人', attackEffect: 'fx_impact', role: 'buffer', image: 'characters/bard.png', hp: 130, atk: 14, def: 12, spd: 120,
     join: { defeatBoss: 30 },
     skills: ['attack', 'defend', 'windSong', 'braveSong', 'lullaby'],
     autoRules: [
@@ -356,7 +356,7 @@ const CHARACTERS = {
     ],
   },
   monk: {
-    name: '拳闘家', role: 'combo', image: 'characters/monk.png', hp: 190, atk: 28, def: 18, spd: 105,
+    name: '拳闘家', attackEffect: 'fx_impact', role: 'combo', image: 'characters/monk.png', hp: 190, atk: 28, def: 18, spd: 105,
     join: { reachFloor: 35 },
     ki: { max: 5, atkPer: 0.08 }, // 気：攻撃するたび1たまる（最大5）。気1つにつき攻撃+8%
     skills: ['attack', 'defend', 'comboStrike', 'hyakuretsu', 'stance'],
@@ -367,7 +367,7 @@ const CHARACTERS = {
     ],
   },
   chronomancer: {
-    name: '時の魔導士', role: 'time', image: 'characters/chronomancer.png', hp: 130, atk: 20, def: 14, spd: 125,
+    name: '時の魔導士', attackEffect: 'fx_impact', role: 'time', image: 'characters/chronomancer.png', hp: 130, atk: 20, def: 14, spd: 125,
     join: { defeatBoss: 40 },
     skills: ['attack', 'defend', 'timeHaste', 'timeStop', 'rewind'],
     autoRules: [
@@ -458,7 +458,7 @@ const ENEMIES = {
   ogre:    { name: '力ため鬼',     type: 'charge',  image: 'enemies/oni.svg',           idle: 'idle-breath', hp: 140, atk: 22, def: 12, spd: 75,  exp: 18,
              traits: [{ type: 'enrageAt', below: 0.5, rate: 1.3 }],
              ai: [{ skill: 'charge', weight: 2, when: { notCharging: true } }, { skill: 'attack', weight: 1, when: { notCharging: true } }, { skill: 'heavyBlow', weight: 1, when: { charging: true } }] },
-  witch:   { name: '呪術師',       type: 'disrupt', image: 'enemies/sorcerer.svg',      idle: 'idle-float',  hp: 80,  atk: 15, def: 8,  spd: 115, exp: 14,
+  witch:   { name: '呪術師', attackEffect: 'fx_dark',       type: 'disrupt', image: 'enemies/sorcerer.svg',      idle: 'idle-float',  hp: 80,  atk: 15, def: 8,  spd: 115, exp: 14,
              traits: [{ type: 'curseOnDeath', stat: 'spd', rate: 0.85, turns: 3 }], ai: [{ skill: 'attack', weight: 1 }, { skill: 'slowCurse', weight: 2 }, { skill: 'shadowBind', weight: 2 }] },
   flower:  { name: '癒し草',       type: 'heal',    image: 'enemies/healing_plant.svg', idle: 'idle-sway',   face: '50% 80%', hp: 75,  atk: 10, def: 10, spd: 95,  exp: 12,
              traits: [{ type: 'regen', value: 0.05 }], ai: [{ skill: 'attack', weight: 1 }, { skill: 'healAlly', weight: 4, when: { allyHpBelow: 0.7 } }] },
@@ -466,43 +466,43 @@ const ENEMIES = {
   // --- 11階以降 ---
   mirrorSlime: { name: 'ミラースライム', type: 'tough',   image: 'enemies/mirror_slime.png',    idle: 'idle-puni',  face: '50% 75%', hp: 90,  atk: 18, def: 20, spd: 90,  exp: 20,
                  traits: [{ type: 'reflect', value: 0.3 }], ai: [{ skill: 'attack', weight: 1 }] },
-  mushroom:    { name: '毒キノコ',       type: 'disrupt', image: 'enemies/poison_mushroom.png', idle: 'idle-sway',  face: '50% 80%',  hp: 85,  atk: 14, def: 10, spd: 80,  exp: 18,
+  mushroom:    { name: '毒キノコ', attackEffect: 'fx_poison',       type: 'disrupt', image: 'enemies/poison_mushroom.png', idle: 'idle-sway',  face: '50% 80%',  hp: 85,  atk: 14, def: 10, spd: 80,  exp: 18,
                  traits: [{ type: 'poisonOnHit', value: 0.05, turns: 3 }], ai: [{ skill: 'attack', weight: 1 }] },
-  skeleton:    { name: '骸骨剣士',       type: 'normal',  image: 'enemies/skeleton.png',        idle: 'idle-breath', hp: 100, atk: 24, def: 14, spd: 95,  exp: 24,
+  skeleton:    { name: '骸骨剣士', attackEffect: 'fx_slash',       type: 'normal',  image: 'enemies/skeleton.png',        idle: 'idle-breath', hp: 100, atk: 24, def: 14, spd: 95,  exp: 24,
                  traits: [{ type: 'endure' }], ai: [{ skill: 'attack', weight: 1 }] },
-  goblin:      { name: '甲冑ゴブリン',   type: 'tough',   image: 'enemies/goblin_guard.png',    idle: 'idle-heavy', face: '50% 20%', hp: 130, atk: 18, def: 30, spd: 70,  exp: 24,
+  goblin:      { name: '甲冑ゴブリン', attackEffect: 'fx_slash',   type: 'tough',   image: 'enemies/goblin_guard.png',    idle: 'idle-heavy', face: '50% 20%', hp: 130, atk: 18, def: 30, spd: 70,  exp: 24,
                  traits: [{ type: 'guardian' }], ai: [{ skill: 'attack', weight: 2 }, { skill: 'harden', weight: 1, when: { notBuff: 'def' } }] },
-  wisp:        { name: '炎の精霊',       type: 'fast',    image: 'enemies/flame_wisp.png',      idle: 'idle-float', face: '50% 80%', hp: 60,  atk: 26, def: 6,  spd: 150, exp: 20,
+  wisp:        { name: '炎の精霊', attackEffect: 'fx_fire',       type: 'fast',    image: 'enemies/flame_wisp.png',      idle: 'idle-float', face: '50% 80%', hp: 60,  atk: 26, def: 6,  spd: 150, exp: 20,
                  traits: [{ type: 'deathBlast', power: 1.5 }, { type: 'selfDestruct', after: 3 }], ai: [{ skill: 'attack', weight: 1 }] },
   mimic:       { name: 'ミミック',       type: 'special', image: 'enemies/mimic.png',           idle: 'idle-heavy', face: '50% 25%', noElite: true, hp: 160, atk: 34, def: 20, spd: 60, exp: 40,
                  traits: [{ type: 'dormant' }, { type: 'rewardOnDefeat' }], ai: [{ skill: 'attack', weight: 2 }, { skill: 'doubleBite', weight: 1 }] },
-  iceFairy:    { name: '氷の妖精',       type: 'disrupt', image: 'enemies/ice_fairy.png',       idle: 'idle-float', face: '50% 15%', hp: 75,  atk: 16, def: 12, spd: 125, exp: 22,
+  iceFairy:    { name: '氷の妖精', attackEffect: 'fx_ice',       type: 'disrupt', image: 'enemies/ice_fairy.png',       idle: 'idle-float', face: '50% 15%', hp: 75,  atk: 16, def: 12, spd: 125, exp: 22,
                  traits: [{ type: 'freezeOnHit', chance: 0.3 }], ai: [{ skill: 'attack', weight: 1 }] },
-  assassin:    { name: '影の暗殺者',     type: 'fast',    image: 'enemies/shadow_assassin.png', idle: 'idle-breath', hp: 90, atk: 30, def: 8,  spd: 160, exp: 28,
+  assassin:    { name: '影の暗殺者', attackEffect: 'fx_slash',     type: 'fast',    image: 'enemies/shadow_assassin.png', idle: 'idle-breath', hp: 90, atk: 30, def: 8,  spd: 160, exp: 28,
                  traits: [{ type: 'evasion', value: 0.3 }, { type: 'targetWeakest' }, { type: 'executeCrit' }], ai: [{ skill: 'attack', weight: 1 }] },
 
   // --- 灼熱の火山（21〜29階） ---
-  magmaSlime:   { name: 'マグマスライム', type: 'normal',  image: 'enemies/magma_slime.png',   idle: 'idle-puni',   face: '50% 70%', hp: 110, atk: 22, def: 16, spd: 85,  exp: 30,
+  magmaSlime:   { name: 'マグマスライム', attackEffect: 'fx_fire', type: 'normal',  image: 'enemies/magma_slime.png',   idle: 'idle-puni',   face: '50% 70%', hp: 110, atk: 22, def: 16, spd: 85,  exp: 30,
                   traits: [{ type: 'statusOnHit', status: 'burn', value: 0.03, turns: 2 }], ai: [{ skill: 'attack', weight: 1 }] },
   salamander:   { name: '火トカゲ',       type: 'fast',    image: 'enemies/salamander.png',    idle: 'idle-breath', face: '90% 55%', hp: 100, atk: 26, def: 12, spd: 110, exp: 32,
                   ai: [{ skill: 'attack', weight: 2 }, { skill: 'flameBreath', weight: 2 }] },
   lavaGolem:    { name: '溶岩ゴーレム',   type: 'tough',   image: 'enemies/lava_golem.png',    idle: 'idle-heavy',  face: '50% 20%', hp: 180, atk: 24, def: 32, spd: 60,  exp: 38,
                   traits: [{ type: 'triggerAt', below: 0.5, skill: 'lavaBurst' }], ai: [{ skill: 'attack', weight: 1 }] },
-  fireBat:      { name: '火炎コウモリ',   type: 'fast',    image: 'enemies/fire_bat.png',      idle: 'idle-flap',   face: '50% 45%', hp: 70,  atk: 22, def: 8,  spd: 165, exp: 30,
+  fireBat:      { name: '火炎コウモリ', attackEffect: 'fx_fire',   type: 'fast',    image: 'enemies/fire_bat.png',      idle: 'idle-flap',   face: '50% 45%', hp: 70,  atk: 22, def: 8,  spd: 165, exp: 30,
                   traits: [{ type: 'statusOnHit', status: 'burn', value: 0.03, turns: 2 }, { type: 'evasion', value: 0.15 }], ai: [{ skill: 'attack', weight: 1 }] },
   bombRock:     { name: '爆弾岩',         type: 'charge',  image: 'enemies/bomb_rock.png',     idle: 'idle-heavy',  face: '50% 55%', hp: 120, atk: 10, def: 40, spd: 50,  exp: 34,
                   traits: [{ type: 'fuse', turns: 3, skill: 'bombBlast' }], ai: [{ skill: 'attack', weight: 1 }] },
   phoenixChick: { name: '不死鳥のヒナ',   type: 'heal',    image: 'enemies/phoenix_chick.png', idle: 'idle-float',  face: '50% 45%', hp: 80,  atk: 18, def: 10, spd: 120, exp: 34,
                   traits: [{ type: 'rebirth', ratio: 1 }], ai: [{ skill: 'attack', weight: 1 }] },
-  flameSamurai: { name: '炎の鬼武者',     type: 'normal',  image: 'enemies/flame_samurai.png', idle: 'idle-breath', face: '50% 25%', hp: 130, atk: 32, def: 20, spd: 105, exp: 40,
+  flameSamurai: { name: '炎の鬼武者', attackEffect: 'fx_slash',     type: 'normal',  image: 'enemies/flame_samurai.png', idle: 'idle-breath', face: '50% 25%', hp: 130, atk: 32, def: 20, spd: 105, exp: 40,
                   traits: [{ type: 'iai', rate: 2 }], ai: [{ skill: 'attack', weight: 1 }] },
-  ashMage:      { name: '灰の魔術師',     type: 'disrupt', image: 'enemies/ash_mage.png',      idle: 'idle-float',  face: '50% 25%', hp: 90,  atk: 28, def: 10, spd: 100, exp: 36,
+  ashMage:      { name: '灰の魔術師', attackEffect: 'fx_fire',     type: 'disrupt', image: 'enemies/ash_mage.png',      idle: 'idle-float',  face: '50% 25%', hp: 90,  atk: 28, def: 10, spd: 100, exp: 36,
                   ai: [{ skill: 'attack', weight: 1 }, { skill: 'ashStorm', weight: 2 }] },
   lavaWorm:     { name: '溶岩ワーム',     type: 'charge',  image: 'enemies/lava_worm.png',     idle: 'idle-sway',   face: '70% 15%', hp: 150, atk: 28, def: 18, spd: 80,  exp: 38,
                   ai: [{ skill: 'attack', weight: 1 }, { skill: 'burrow', weight: 2 }] },
 
   // --- 深海の神殿（31〜39階） ---
-  jellyfish:    { name: 'クラゲ',         type: 'disrupt', image: 'enemies/jellyfish.png',     idle: 'idle-float',  face: '50% 30%', hp: 85,  atk: 18, def: 12, spd: 95,  exp: 44,
+  jellyfish:    { name: 'クラゲ', attackEffect: 'fx_thunder',         type: 'disrupt', image: 'enemies/jellyfish.png',     idle: 'idle-float',  face: '50% 30%', hp: 85,  atk: 18, def: 12, spd: 95,  exp: 44,
                   traits: [{ type: 'delayOnHit', amount: 0.5, label: '麻痺' }], ai: [{ skill: 'attack', weight: 1 }] },
   crabKnight:   { name: 'カニ騎士',       type: 'tough',   image: 'enemies/crab_knight.png',   idle: 'idle-heavy',  face: '50% 45%', hp: 160, atk: 26, def: 40, spd: 70,  exp: 50,
                   traits: [{ type: 'counter', chance: 0.3 }], ai: [{ skill: 'attack', weight: 2 }, { skill: 'harden', weight: 1, when: { notBuff: 'def' } }] },
@@ -512,13 +512,13 @@ const ENEMIES = {
                   traits: [{ type: 'puffUp' }], ai: [{ skill: 'attack', weight: 1 }] },
   octoMage:     { name: 'タコ魔導士',     type: 'disrupt', image: 'enemies/octo_mage.png',     idle: 'idle-sway',   face: '50% 45%', hp: 100, atk: 30, def: 12, spd: 100, exp: 48,
                   ai: [{ skill: 'attack', weight: 2 }, { skill: 'inkSpray', weight: 2 }] },
-  fishman:      { name: '半魚人戦士',     type: 'normal',  image: 'enemies/fishman.png',       idle: 'idle-breath', face: '50% 20%', hp: 130, atk: 30, def: 22, spd: 105, exp: 50,
+  fishman:      { name: '半魚人戦士', attackEffect: 'fx_slash',     type: 'normal',  image: 'enemies/fishman.png',       idle: 'idle-breath', face: '50% 20%', hp: 130, atk: 30, def: 22, spd: 105, exp: 50,
                   traits: [{ type: 'pack', rate: 1.2 }], ai: [{ skill: 'attack', weight: 1 }] },
   clam:         { name: '大貝',           type: 'tough',   image: 'enemies/clam.png',          idle: 'idle-heavy',  face: '50% 55%', hp: 140, atk: 16, def: 50, spd: 60,  exp: 46,
                   traits: [{ type: 'guardCycle', every: 3, status: 'shelled' }, { type: 'pointsOnDefeat', value: 3 }], ai: [{ skill: 'attack', weight: 1 }] },
   anglerfish:   { name: '深海アンコウ',   type: 'charge',  image: 'enemies/anglerfish.png',    idle: 'idle-sway',   face: '60% 35%', hp: 170, atk: 36, def: 18, spd: 75,  exp: 56,
                   traits: [{ type: 'taunt' }], ai: [{ skill: 'attack', weight: 2 }, { skill: 'bigMouth', weight: 1 }] },
-  ghostCaptain: { name: '幽霊船長',       type: 'disrupt', image: 'enemies/ghost_captain.png', idle: 'idle-float',  face: '50% 30%', hp: 120, atk: 30, def: 16, spd: 110, exp: 54,
+  ghostCaptain: { name: '幽霊船長', attackEffect: 'fx_slash',       type: 'disrupt', image: 'enemies/ghost_captain.png', idle: 'idle-float',  face: '50% 30%', hp: 120, atk: 30, def: 16, spd: 110, exp: 54,
                   traits: [{ type: 'ethereal', value: 0.5 }], ai: [{ skill: 'attack', weight: 2 }, { skill: 'summonSkeleton', weight: 1 }] },
 
   // --- 天空の城（41〜49階） ---
@@ -526,11 +526,11 @@ const ENEMIES = {
                   traits: [{ type: 'evasion', value: 0.4 }], ai: [{ skill: 'attack', weight: 1 }] },
   stormBird:    { name: '嵐の怪鳥',       type: 'fast',    image: 'enemies/storm_bird.png',    idle: 'idle-flap',   face: '50% 25%', hp: 110, atk: 30, def: 14, spd: 170, exp: 62,
                   traits: [{ type: 'delayOnHit', amount: 0.3, label: '突風' }], ai: [{ skill: 'attack', weight: 1 }] },
-  thunderSprite:{ name: '雷の精霊',       type: 'fast',    image: 'enemies/thunder_sprite.png', idle: 'idle-float', face: '50% 45%', hp: 80,  atk: 32, def: 8,  spd: 150, exp: 60,
+  thunderSprite:{ name: '雷の精霊', attackEffect: 'fx_thunder',       type: 'fast',    image: 'enemies/thunder_sprite.png', idle: 'idle-float', face: '50% 45%', hp: 80,  atk: 32, def: 8,  spd: 150, exp: 60,
                   ai: [{ skill: 'attack', weight: 1 }, { skill: 'chainLightning', weight: 2 }] },
   gargoyle:     { name: 'ガーゴイル',     type: 'tough',   image: 'enemies/gargoyle.png',      idle: 'idle-heavy',  face: '50% 20%', hp: 160, atk: 30, def: 36, spd: 70,  exp: 64,
                   traits: [{ type: 'guardCycle', every: 2, status: 'stone' }], ai: [{ skill: 'attack', weight: 1 }] },
-  angelSoldier: { name: '天使兵',         type: 'heal',    image: 'enemies/angel_soldier.png', idle: 'idle-float',  face: '50% 20%', hp: 140, atk: 32, def: 28, spd: 100, exp: 66,
+  angelSoldier: { name: '天使兵', attackEffect: 'fx_slash',         type: 'heal',    image: 'enemies/angel_soldier.png', idle: 'idle-float',  face: '50% 20%', hp: 140, atk: 32, def: 28, spd: 100, exp: 66,
                   ai: [{ skill: 'resurrect', weight: 100, when: { allyDead: true } }, { skill: 'attack', weight: 1 }] },
   griffon:      { name: 'グリフォン',     type: 'fast',    image: 'enemies/griffon.png',       idle: 'idle-breath', face: '50% 20%', hp: 170, atk: 38, def: 22, spd: 140, exp: 70,
                   ai: [{ skill: 'attack', weight: 2 }, { skill: 'griffonDive', weight: 1 }] },
@@ -542,7 +542,7 @@ const ENEMIES = {
                   ai: [{ skill: 'attack', weight: 1 }, { skill: 'timeMagic', weight: 2 }] },
 
   // --- ボス ---
-  golem:   { name: 'ゴーレム王',   type: 'boss',    image: 'enemies/golem_king.svg',    idle: 'idle-heavy',  enrageBelow: 0.5, hp: 520, atk: 26, def: 22, spd: 85,  exp: 120, ai: [
+  golem:   { name: 'ゴーレム王', attackEffect: 'fx_impact',   type: 'boss',    image: 'enemies/golem_king.svg',    idle: 'idle-heavy',  enrageBelow: 0.5, hp: 520, atk: 26, def: 22, spd: 85,  exp: 120, ai: [
     // HP50%以上：様子見の攻撃と防御強化
     { skill: 'attack', weight: 3, when: { hpAbove: 0.5 } },
     { skill: 'harden', weight: 1, when: { hpAbove: 0.5, notBuff: 'def' } },
@@ -675,15 +675,18 @@ const DUNGEON = {
 
 // ---------------------------------------------------------------------
 // エリア（from 階から次のエリアの手前まで。ボス階は前のエリアに含まれる）
-// bg: バトル画面の背景（CSS） / text: 背景の上の見出しの色
+// image: バトル画面いっぱいに出す背景画像（1280×720）
+// bg: 画像を読み込むまでの下地の色（CSS） / text: 背景の上の文字の色
+// images: 無限モード用。10階ごとに順番に使う
 // ---------------------------------------------------------------------
 const AREAS = [
-  { from: 1,  name: 'はじまりの洞窟', bg: 'linear-gradient(180deg, #2c3248 0%, #1e2230 100%)', text: '#9aa3c0' },
-  { from: 11, name: '闇の迷宮',       bg: 'linear-gradient(180deg, #2e2446 0%, #19152a 100%)', text: '#b8a8e0' },
-  { from: 21, name: '灼熱の火山',     bg: 'linear-gradient(180deg, #6e1a10 0%, #b8441a 60%, #e07a2a 100%)', text: '#ffe2c4' },
-  { from: 31, name: '深海の神殿',     bg: 'linear-gradient(180deg, #0a2350 0%, #12477e 55%, #1f73a8 100%)', text: '#cfe8ff' },
-  { from: 41, name: '天空の城',       bg: 'linear-gradient(180deg, #f6fbff 0%, #d4ecfb 50%, #9fd4f2 100%)', text: '#24476a' },
-  { from: 51, name: '無限回廊',       bg: 'linear-gradient(180deg, #22113a 0%, #3c1a52 60%, #5a2470 100%)', text: '#e4ccff' },
+  { from: 1,  name: '始まりの森',     image: 'backgrounds/bg_forest.jpg',  bg: 'linear-gradient(180deg, #8ac8f0 0%, #6ab05a 100%)', text: '#1e3a20' },
+  { from: 11, name: '古の地下迷宮',   image: 'backgrounds/bg_dungeon.jpg', bg: 'linear-gradient(180deg, #2e2446 0%, #19152a 100%)', text: '#b8a8e0' },
+  { from: 21, name: '灼熱の火山',     image: 'backgrounds/bg_volcano.jpg', bg: 'linear-gradient(180deg, #6e1a10 0%, #b8441a 60%, #e07a2a 100%)', text: '#ffe2c4' },
+  { from: 31, name: '深海の神殿',     image: 'backgrounds/bg_sea.jpg',     bg: 'linear-gradient(180deg, #0a2350 0%, #12477e 55%, #1f73a8 100%)', text: '#cfe8ff' },
+  { from: 41, name: '天空の城',       image: 'backgrounds/bg_sky.jpg',     bg: 'linear-gradient(180deg, #f6fbff 0%, #d4ecfb 50%, #9fd4f2 100%)', text: '#24476a' },
+  { from: 51, name: '無限回廊',       bg: 'linear-gradient(180deg, #22113a 0%, #3c1a52 60%, #5a2470 100%)', text: '#e4ccff',
+    images: ['backgrounds/bg_forest.jpg', 'backgrounds/bg_dungeon.jpg', 'backgrounds/bg_volcano.jpg', 'backgrounds/bg_sea.jpg', 'backgrounds/bg_sky.jpg'] },
 ];
 
 // ---------------------------------------------------------------------
