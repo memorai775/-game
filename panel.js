@@ -80,7 +80,22 @@ function itemLabel(id) {
   return `<span class="item-name tier${item.tier}">${item.name}</span>`;
 }
 
-// アイテムのアイコン（上級は金色の枠）。size: 'sm' / 'md' / 'lg'
+// 特級装備ができたときの演出（虹色の光＋お知らせ）
+function celebrateLegend(itemId) {
+  const stage = document.getElementById('stage');
+  const flash = document.createElement('div');
+  flash.className = 'legend-flash';
+  stage.appendChild(flash);
+  setTimeout(() => flash.remove(), 1800);
+  if (typeof UI !== 'undefined') {
+    UI.popup(`
+      <div class="legend-made">${itemIcon(itemId, 'lg')}</div>
+      <p class="popup-title">✨ ${itemLabel(itemId)} ができた！</p>
+      <p class="popup-note">${ITEMS[itemId].desc}</p>`);
+  }
+}
+
+// アイテムのアイコン（上級は金色の枠、特級は虹色の枠）。size: 'sm' / 'md' / 'lg'
 // unknown: true なら図鑑の未入手（シルエット・名前を出さない）
 // 画像が読み込めないときは、名前の1文字目を代わりに出す
 function itemIcon(id, size = 'md', unknown = false) {
@@ -449,11 +464,28 @@ const ItemUI = {
   },
 
   // --- 合成：レシピ一覧（作れるものは光る）と、2つ選んで合成 ---
+  craftTab: 'normal', // 'normal'（通常合成） / 'legend'（特級合成）
+  legendPicks: [],    // 特級合成で選んだ上級装備（最大3つ）
+  legendChoice: null, // 一番多い素材が同数のとき、選んだ系統（下級素材のID）
+
   renderCrafting() {
     const sec = this.section('合成');
     if (this.message) {
       sec.insertAdjacentHTML('beforeend', `<div class="craft-message">${this.message}</div>`);
     }
+    // 通常合成／特級合成のタブ
+    const tabs = document.createElement('div');
+    tabs.className = 'craft-tabs';
+    for (const [key, label] of [['normal', '通常合成'], ['legend', '✨ 特級合成']]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.className = this.craftTab === key ? 'active' : '';
+      b.addEventListener('click', () => { this.craftTab = key; this.render(); });
+      tabs.appendChild(b);
+    }
+    sec.appendChild(tabs);
+    if (this.craftTab === 'legend') { this.renderLegendCraft(sec); return; }
 
     // 2つ選んで合成（下級2つならどの組み合わせでも上級になる）
     const counts = inventoryCounts();
@@ -534,6 +566,116 @@ const ItemUI = {
     sec.appendChild(grid);
   },
   onlyReady: false, // 図鑑で「作れるものだけ」表示するか
+
+  // --- 特級合成：上級装備を3つ選ぶ → できあがりをプレビュー → 確認して作る ---
+  renderLegendCraft(sec) {
+    sec.insertAdjacentHTML('beforeend', `<div class="panel-note">上級装備を3つ選ぶと、含まれる下級素材（1つにつき2個、合計6個）で一番多い系統の特級装備ができます。その素材の数でランク（★1〜★5）が決まります。</div>`);
+    const counts = inventoryCounts();
+    // 持っていない分は選択から外す（所持品が減ったときのため）
+    const left = { ...counts };
+    this.legendPicks = this.legendPicks.filter(id => (left[id] = (left[id] || 0) - 1) >= 0);
+
+    // 選んだ3つ（タップで外す）
+    const slots = document.createElement('div');
+    slots.className = 'legend-slots';
+    for (let i = 0; i < 3; i++) {
+      const id = this.legendPicks[i];
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'legend-slot';
+      if (id) {
+        const mats = itemMaterials(id).map(m => itemIcon(m, 'sm')).join('');
+        cell.innerHTML = `${itemIcon(id, 'md')}<span class="legend-mats">${mats}</span>`;
+        cell.title = `${ITEMS[id].name}（タップで外す）`;
+        cell.addEventListener('click', () => { this.legendPicks.splice(i, 1); this.legendChoice = null; this.render(); });
+      } else {
+        cell.innerHTML = '<span class="item-icon md empty"></span><span class="legend-mats">空き</span>';
+        cell.disabled = true;
+      }
+      slots.appendChild(cell);
+    }
+    sec.appendChild(slots);
+
+    // プレビュー（3つそろったら）
+    if (this.legendPicks.length === 3) sec.appendChild(this.legendPreviewBox());
+
+    // 所持している上級装備（タップで選ぶ）
+    const used = {};
+    for (const id of this.legendPicks) used[id] = (used[id] || 0) + 1;
+    const highs = Object.keys(counts).filter(id => ITEMS[id].tier === 2);
+    const grid = document.createElement('div');
+    grid.className = 'inv-grid legend-pick-grid';
+    if (!highs.length) {
+      sec.insertAdjacentHTML('beforeend', '<div class="panel-note">上級装備を持っていません（合成やボスの報酬で手に入ります）。</div>');
+      return;
+    }
+    for (const id of highs) {
+      const rest = counts[id] - (used[id] || 0);
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'inv-cell';
+      cell.disabled = rest <= 0 || this.legendPicks.length >= 3;
+      cell.title = `${ITEMS[id].name}：${ITEMS[id].desc}`;
+      cell.innerHTML = `${itemIcon(id, 'lg')}<span class="inv-count">×${rest}</span>`;
+      cell.addEventListener('click', () => {
+        if (this.legendPicks.length >= 3) return;
+        this.legendPicks.push(id);
+        this.legendChoice = null;
+        this.render();
+      });
+      grid.appendChild(cell);
+    }
+    sec.appendChild(grid);
+  },
+
+  // できあがる特級装備のプレビュー（素材の内訳・系統の選択・効果）と、作るボタン
+  legendPreviewBox() {
+    const box = document.createElement('div');
+    box.className = 'legend-preview';
+    const pv = legendPreview(this.legendPicks);
+    const base = pv.candidates.includes(this.legendChoice) ? this.legendChoice : pv.candidates[0];
+    // 素材の内訳（多い順）
+    const breakdown = Object.keys(pv.counts).sort((a, b) => pv.counts[b] - pv.counts[a])
+      .map(m => `<span class="legend-count${pv.candidates.includes(m) ? ' top' : ''}">${itemIcon(m, 'sm')}×${pv.counts[m]}</span>`).join('');
+    box.innerHTML = `<div class="legend-breakdown">素材：${breakdown}</div>`;
+    // 同数で並んだら、どの系統にするか選べる
+    if (pv.candidates.length > 1) {
+      const pick = document.createElement('div');
+      pick.className = 'legend-choice';
+      pick.innerHTML = '<span>一番多い素材が同じ数です。どれにしますか？</span>';
+      for (const c of pv.candidates) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = c === base ? 'active' : '';
+        b.innerHTML = `${itemIcon(legendId(c, pv.rank), 'sm')} ${LEGEND.families[c].name}`;
+        b.addEventListener('click', () => { this.legendChoice = c; this.render(); });
+        pick.appendChild(b);
+      }
+      box.appendChild(pick);
+    }
+    const resultId = legendId(base, pv.rank);
+    box.insertAdjacentHTML('beforeend', `
+      <div class="legend-result">${itemIcon(resultId, 'lg')}
+        <span>できあがり：${itemLabel(resultId)}<small>${ITEMS[resultId].desc}</small>
+        <small>素材「${ITEMS[base].name}」${pv.top}個 → ★${pv.rank}（効果${Math.round(LEGEND.rankRates[pv.rank] * 100)}%）</small></span>
+      </div>`);
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'legend-go';
+    go.textContent = '✨ 特級合成する';
+    go.addEventListener('click', () => {
+      if (!confirm('素材の上級装備3つは消えます。よろしいですか？')) return;
+      const made = craftLegend(this.legendPicks, base);
+      if (!made) { this.message = '素材が足りません。'; afterProgressChange(); return; }
+      this.legendPicks = [];
+      this.legendChoice = null;
+      this.message = `${ITEMS[made].name}ができた！`;
+      afterProgressChange();
+      celebrateLegend(made);
+    });
+    box.appendChild(go);
+    return box;
+  },
 
   doCraft(recipe) {
     if (!canCraft(recipe)) {

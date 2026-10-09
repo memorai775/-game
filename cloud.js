@@ -150,7 +150,7 @@ const Cloud = {
 
   // クラウドのセーブで続きから再開する
   applyRemote(remote) {
-    applySaveData(remote);
+    applySaveData(remote); // 古い版のデータなら、ここで移行される
     saveGame();
     allyHp = {};
     battle = null; // 進行中の戦闘を止める
@@ -159,6 +159,7 @@ const Cloud = {
     Panel.refresh();
     UI.renderHeader();
     showToast('クラウドのセーブデータから続きを始めます');
+    showUpdateNotice(); // 移行した人へのお知らせ（まだ見ていなければ）
   },
 
   async push() {
@@ -247,8 +248,10 @@ const Cloud = {
     Modal.open('☁ アカウント', `
       <table class="account-table">
         <tr><th>状態</th><td>${google ? `Googleアカウント連携済み<br><small>${escapeHtml(email)}</small>` : 'ゲスト（匿名）'}</td></tr>
-        <tr><th>ニックネーム</th><td>${escapeHtml(gameState.nickname || '未設定')}</td></tr>
+        <tr><th>ニックネーム</th><td>${escapeHtml(gameState.nickname || '未設定')}${(gameState.titles || []).map(t => ` <span class="title-badge">🏅${escapeHtml(t)}</span>`).join('')}</td></tr>
         <tr><th>最高到達</th><td>${gameState.bestFloor}階</td></tr>
+        ${gameState.endlessBest ? `<tr><th>無限モード</th><td>最高 ${gameState.endlessBest}階</td></tr>` : ''}
+        ${oldRecordText() ? `<tr><th>旧記録</th><td><small>${oldRecordText()}</small></td></tr>` : ''}
         <tr><th>最後の保存</th><td>${escapeHtml(last)}</td></tr>
       </table>
       ${google ? '<p class="modal-note">別の端末でも「Googleアカウントで引き継ぐ」を押して同じアカウントを選ぶと、続きから遊べます。</p>'

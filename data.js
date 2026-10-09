@@ -26,7 +26,7 @@ const ROLE_LABELS = {
 };
 const ENEMY_TYPE_LABELS = {
   normal: 'ふつう', fast: 'すばやい系', tough: 'かたい系', charge: 'ためる系',
-  disrupt: '妨害系', heal: '回復系', special: '特殊', boss: 'ボス',
+  disrupt: '妨害系', heal: '回復系', special: '特殊', boss: 'ボス', treasure: 'お宝',
 };
 
 // ---------------------------------------------------------------------
@@ -66,6 +66,23 @@ const ENEMY_TYPE_LABELS = {
 //   { type: 'fillGauge' }                              行動ゲージを満タンに（すぐ行動）
 //   { type: 'rewind', turns: 3 }                       HPを turns ターン前（その味方の行動で数える）の値に戻す
 //   damage に sureCritBelow: 0.3 を付けると、HPがその割合以下の相手には必ず会心
+//   damage に drain: 1 を付けると、与えたダメージ×drain だけ自分が回復（魂吸収）
+//   damage に ignoreDef: true を付けると、相手の防御を無視（突進）
+//   { type: 'execute', below: 0.25, power: 1.0 }      HPがbelow以下の相手を即死（ボスは除く）。それ以外は power 倍ダメージ
+//   { type: 'swapOrder' }                              味方と敵を1人ずつ選び、行動順を入れ替える
+//   { type: 'dispel' }                                 相手の強化効果を全部消す
+//   { type: 'stackDebuff', stat, rate, tag, limit }    重ねがけできる能力ダウン（limit 倍で止まる）
+//   { type: 'freeze', chance: 0.2 }                    凍結（行動ゲージ0）
+//   { type: 'entomb', turns: 4 }                       氷漬け（行動不能。HPを持つ「氷塊」が出て、壊すと解ける）
+//   { type: 'summonPool' }                             この階の敵を1体呼び出す（呼んだ本人が倒れると消える）
+//   { type: 'devourBuffs' }                            相手の強化効果を全部奪って自分に付ける
+//   damage に skipFrozen: true を付けると、凍結・氷漬けの相手には効かない（絶対零度）
+//   { type: 'partStrikes', power: 0.45 }               残っている部位の数だけ、ランダムな相手を攻撃（クラーケンの足）
+//   { type: 'drums', enemy: 'thunderDrum', count: 5 }  行動順リストにだけ出る「雷」を count 個仕込む（光った順に落ちる）
+//   { type: 'openCore' }                               自分のコアを開く（次の自分の行動まで攻撃が通る）
+//   { type: 'summonBoss', list: [...], hpRate: 0.25 }  過去のボスを1体呼び出す（HPは hpRate 倍）
+//   { type: 'annihilate' }                             相手全員を倒す（終焉のカウントダウン）
+// スキルに element: 'fire' / 'light' を付けると属性つきの技（ゾンビの起き上がりを防ぐ）
 // スキルに magic: true を付けると魔法の技（霊体に軽減されない）
 // 効果ごとに target: 'self' を書くと、その効果だけ自分にかかる（例：攻撃＋自分強化）
 // 効果ごとに target: 'allAllies' を書くと、その効果だけ自分の仲間全員にかかる（例：全体攻撃＋仲間強化）
@@ -156,7 +173,78 @@ const SKILLS = {
   skyBarrier:    { name: '天空結界', effect: 'fx_shield',   target: 'self', cooldown: 6, desc: '3ターン受けるダメージ半減', effects: [{ type: 'status', status: 'barrier', turns: 3 }] },
   lightRain:     { name: '光の雨', effect: 'fx_thunder',     target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に1.2倍ダメージ', effects: [{ type: 'damage', power: 1.2 }] },
   endLight:      { name: '終焉の光', effect: 'fx_explosion',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に4倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 4.0 }] },
+
+  // --- 冥府の墓地（51〜60階） ---
+  deathScythe:   { name: '死の鎌', effect: 'fx_dark',     target: 'lowestRatioEnemy', cooldown: 2, danger: true, desc: 'HP25%以下の相手1人を即死させる（それ以外の相手には1.0倍ダメージ）', effects: [{ type: 'execute', below: 0.25, power: 1.0 }] },
+  bandageBind:   { name: '包帯しばり', effect: 'fx_dark', target: 'enemy', cooldown: 3, desc: '相手1人を2ターン行動不能にする（攻撃されると解ける）', effects: [{ type: 'status', status: 'bound', turns: 3 }] },
+  soulArrow:     { name: '魂の矢', effect: 'fx_dark',     target: 'enemy', desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  raiseDead:     { name: '死者召喚', effect: 'fx_dark',   target: 'self', cooldown: 4, desc: 'ゾンビを2体呼ぶ', effects: [{ type: 'summon', enemy: 'zombie', count: 2 }] },
+  soulDrain:     { name: '魂吸収', effect: 'fx_dark',     target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に0.8倍ダメージ＋与えたダメージの合計だけ回復', effects: [{ type: 'damage', power: 0.8, drain: 1 }] },
+  deathSentence: { name: '死の宣告', effect: 'fx_dark',   target: 'enemy', cooldown: 3, danger: true, desc: '相手1人に死の宣告（3回行動すると即死。リッチを倒すか回復で解除）', effects: [{ type: 'status', status: 'doom', turns: 3 }] },
+
+  // --- 魔界の城（61〜70階） ---
+  mischief:      { name: 'いたずら', effect: 'fx_time',   target: 'self', cooldown: 2, desc: '味方と敵の行動順を1組ランダムに入れ替える', effects: [{ type: 'swapOrder' }] },
+  glare:         { name: '睨み', effect: 'fx_dark',       target: 'enemy', cooldown: 3, desc: '相手1人のスキルを2ターン封印（通常攻撃のみになる）', effects: [{ type: 'status', status: 'sealed', turns: 3 }] },
+  tripleBite:    { name: '3連続かみつき', effect: 'fx_impact', target: 'enemy', desc: '0.5倍ダメージ×3回', effects: [{ type: 'damage', power: 0.5, hits: 3 }] },
+  rush:          { name: '突進', effect: 'fx_impact',     target: 'enemy', cooldown: 2, danger: true, desc: '防御を無視して1.8倍ダメージ', effects: [{ type: 'damage', power: 1.8, ignoreDef: true }] },
+  darkSpell:     { name: '闇の呪文', effect: 'fx_dark',   target: 'allEnemies', desc: '相手全員に0.9倍ダメージ', effects: [{ type: 'damage', power: 0.9 }] },
+  mendPage:      { name: '癒しのページ', effect: 'fx_heal', target: 'allAllies', desc: '仲間全員のHPを20%回復', effects: [{ type: 'heal', ratio: 0.2 }] },
+  slowPage:      { name: '鈍足のページ', effect: 'fx_debuff', target: 'allEnemies', desc: '相手全員の速度-20%（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 0.8, turns: 3 }] },
+  haggle:        { name: '品定め', target: 'self', desc: '何もせず、こちらの様子をうかがっている', effects: [] },
+  demonSword:    { name: '魔剣', effect: 'fx_slash',      target: 'enemy', desc: '0.9倍ダメージ×2回', effects: [{ type: 'damage', power: 0.9, hits: 2 }] },
+  darkWave:      { name: '闇の波動', effect: 'fx_dark',   target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に1.0倍ダメージ＋強化効果を消す', effects: [{ type: 'damage', power: 1.0 }, { type: 'dispel' }] },
+  endFlame:      { name: '終焉の魔焔', effect: 'fx_explosion', target: 'allEnemies', shake: true, danger: true, desc: '相手全員に5倍ダメージ（防御で半減）', effects: [{ type: 'damage', power: 5.0 }] },
+
+  // --- 凍てつく氷河（71〜80階） ---
+  blizzard:      { name: '吹雪', effect: 'fx_ice',         target: 'allEnemies', cooldown: 1, desc: '相手全員の速度-15%（重ねがけ）', effects: [{ type: 'stackDebuff', stat: 'spd', rate: 0.85, tag: 'blizzard', limit: 0.4 }] },
+  freezingBreath:{ name: '凍える息', effect: 'fx_ice',     target: 'allEnemies', cooldown: 2, desc: '相手全員に0.9倍ダメージ＋20%で凍結（行動ゲージ0）', effects: [{ type: 'damage', power: 0.9 }, { type: 'freeze', chance: 0.2 }] },
+  quakeStomp:    { name: '地響き', effect: 'fx_impact',    target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に1.0倍ダメージ＋行動ゲージ-30%', effects: [{ type: 'damage', power: 1.0 }, { type: 'delay', amount: 0.3 }] },
+  snowballThrow: { name: '雪玉投げ', effect: 'fx_ice',     target: 'self', desc: 'ランダムな相手に0.6倍ダメージ×3回', effects: [{ type: 'damageRandom', power: 0.6, count: 3 }] },
+  iceClub:       { name: '氷の棍棒', effect: 'fx_impact',  target: 'enemy', desc: '1.4倍ダメージ', effects: [{ type: 'damage', power: 1.4 }] },
+  glacierPress:  { name: '氷河の圧力', effect: 'fx_ice',   target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に1.0倍ダメージ', effects: [{ type: 'damage', power: 1.0 }] },
+  iceEntomb:     { name: '氷漬け', effect: 'fx_ice',       target: 'enemy', cooldown: 4, desc: '相手1人を氷漬けにする（3ターン行動不能。氷を攻撃して壊せば助けられる）', effects: [{ type: 'entomb', turns: 4 }] },
+  absoluteZero:  { name: '絶対零度', effect: 'fx_ice',     target: 'allEnemies', shake: true, danger: true, desc: '凍結していない相手全員に4倍ダメージ（凍結・氷漬けの相手には効かない）', effects: [{ type: 'damage', power: 4.0, skipFrozen: true }] },
+  idle:          { name: 'ようすを見る', target: 'self', desc: '何もしない', effects: [] },
+
+  // --- 星の神殿（81〜90階） ---
+  meteorFall:    { name: '落下', effect: 'fx_explosion',   target: 'allEnemies', shake: true, danger: true, desc: '相手全員に0.8倍ダメージ×2回', effects: [{ type: 'damage', power: 0.8, hits: 2 }] },
+  mochi:         { name: '餅つき', effect: 'fx_heal',      target: 'allAllies', cooldown: 2, desc: '仲間全員のHPを15%回復＋攻撃+10%（3ターン）', effects: [{ type: 'heal', ratio: 0.15 }, { type: 'buff', stat: 'atk', rate: 1.1, turns: 3, tag: 'mochi' }] },
+  starReading:   { name: '星占い', effect: 'fx_buff',      target: 'self', cooldown: 2, desc: '次に受ける単体攻撃を見切ってかわし、反撃する', effects: [{ type: 'status', status: 'foresight', turns: 99 }] },
+  laser:         { name: 'レーザー', effect: 'fx_thunder', target: 'enemy', cooldown: 2, desc: '防御を無視して1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3, ignoreDef: true }] },
+  riftSummon:    { name: '次元の呼び声', effect: 'fx_dark', target: 'self', desc: 'この階の敵を1体呼び出す', effects: [{ type: 'summonPool' }] },
+  reverseTime:   { name: '時間逆行', effect: 'fx_time',    target: 'self', oncePerBattle: true, desc: '自分のHPを2ターン前の値に戻す（1戦闘1回）', effects: [{ type: 'rewind', turns: 2 }] },
+  voidTentacles: { name: '虚無の触手', effect: 'fx_dark',  target: 'self', desc: 'ランダムな相手に0.6倍ダメージ×4回', effects: [{ type: 'damageRandom', power: 0.6, count: 4 }] },
+  starEater:     { name: '星喰い', effect: 'fx_dark',      target: 'enemy', cooldown: 2, desc: '相手1人の強化効果を全部奪って自分に付ける＋1.0倍ダメージ', effects: [{ type: 'devourBuffs' }, { type: 'damage', power: 1.0 }] },
+  eyeBeam:       { name: '虚神の眼光', effect: 'fx_dark',  target: 'allEnemies', shake: true, desc: '相手全員に0.8倍ダメージ（目が残っている間、毎ターン）', effects: [{ type: 'damage', power: 0.8 }] },
+
+  // --- 神々の塔（91〜100階） ---
+  issen:         { name: '一閃', effect: 'fx_slash',        target: 'allEnemies', cooldown: 3, shake: true, danger: true, desc: '相手全員に1.2倍ダメージ。HP50%以下の相手は即死', effects: [{ type: 'execute', below: 0.5, power: 1.2 }] },
+  hellfire:      { name: '獄炎', effect: 'fx_fire',          target: 'allEnemies', cooldown: 2, shake: true, desc: '相手全員に1.0倍ダメージ＋やけど（3%、3ターン）', effects: [{ type: 'damage', power: 1.0 }, { type: 'status', status: 'burn', value: 0.03, turns: 3 }] },
+  dragonClaw:    { name: '竜の爪', effect: 'fx_slash',       target: 'enemy', desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  tentacleBarrage:{ name: '触手乱打', effect: 'fx_impact',   target: 'self', desc: '残っている足の数だけ、ランダムな相手に0.45倍ダメージ', effects: [{ type: 'partStrikes', power: 0.45 }] },
+  krakenSlam:    { name: 'たたきつけ', effect: 'fx_impact',  target: 'enemy', desc: '1.4倍ダメージ', effects: [{ type: 'damage', power: 1.4 }] },
+  thunderDrums:  { name: '雷の太鼓', effect: 'fx_thunder',   target: 'self', cooldown: 5, danger: true, desc: '5つの太鼓が光り、光った順に雷が落ちる（行動順リストで予告）', effects: [{ type: 'drums', enemy: 'thunderDrum', count: 5 }] },
+  drumStrike:    { name: '落雷', effect: 'fx_thunder',       target: 'enemy', danger: true, desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  thunderSpear:  { name: '雷槍', effect: 'fx_thunder',       target: 'enemy', desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  foxFire:       { name: '狐火', effect: 'fx_fire',          target: 'allEnemies', cooldown: 2, desc: '相手全員に0.9倍ダメージ', effects: [{ type: 'damage', power: 0.9 }] },
+  foxBite:       { name: '噛みつき', effect: 'fx_impact',    target: 'enemy', desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  mechPunch:     { name: '鉄拳', effect: 'fx_impact',        target: 'enemy', desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  coreLaser:     { name: '全体レーザー', effect: 'fx_thunder', target: 'allEnemies', shake: true, danger: true, desc: '相手全員に1.3倍ダメージ。そのあとコアが開く（次の行動まで）', effects: [{ type: 'damage', power: 1.3 }, { type: 'openCore', target: 'self' }] },
+  headBite:      { name: '首の噛みつき', effect: 'fx_impact', target: 'enemy', desc: '0.7倍ダメージ', effects: [{ type: 'damage', power: 0.7 }] },
+  hydraBreath:   { name: '毒の息', effect: 'fx_poison',      target: 'allEnemies', cooldown: 3, desc: '相手全員に0.6倍ダメージ＋毒（4%、3ターン）', effects: [{ type: 'damage', power: 0.6 }, { type: 'status', status: 'poison', value: 0.04, turns: 3 }] },
+  inversion:     { name: '反転', effect: 'fx_dark',          target: 'allEnemies', cooldown: 4, desc: '相手全員を反転状態にする（3ターン：回復がダメージに、受けたダメージは2ターン後に回復に）', effects: [{ type: 'status', status: 'inverted', turns: 4 }] },
+  fallenSpear:   { name: '堕天の槍', effect: 'fx_dark',      target: 'enemy', desc: '1.4倍ダメージ', effects: [{ type: 'damage', power: 1.4 }] },
+  darkFeathers:  { name: '黒い羽', effect: 'fx_dark',        target: 'allEnemies', cooldown: 2, desc: '相手全員に0.9倍ダメージ', effects: [{ type: 'damage', power: 0.9 }] },
+  chronoBlade:   { name: '時の刃', effect: 'fx_time',        target: 'enemy', desc: '1.3倍ダメージ', effects: [{ type: 'damage', power: 1.3 }] },
+  timeWave:      { name: '時の波', effect: 'fx_time',        target: 'allEnemies', cooldown: 2, desc: '相手全員に0.9倍ダメージ＋行動ゲージ-20%', effects: [{ type: 'damage', power: 0.9 }, { type: 'delay', amount: 0.2 }] },
+  genesisLight:  { name: '創世の光', effect: 'fx_thunder',   target: 'allEnemies', cooldown: 1, shake: true, desc: '相手全員に1.0倍ダメージ', effects: [{ type: 'damage', power: 1.0 }] },
+  summonPastBoss:{ name: '過去の召喚', effect: 'fx_dark',    target: 'self', cooldown: 4, desc: '過去のボスを1体呼び出す（HPは本来の25%）', effects: [{ type: 'summonBoss', list: ['golem', 'dragon', 'ignis', 'leviathan', 'zenith', 'lichKing', 'demonLord'], hpRate: 0.25 }] },
+  originStrike:  { name: '終焉の一撃', effect: 'fx_explosion', target: 'enemy', desc: '1.5倍ダメージ', effects: [{ type: 'damage', power: 1.5 }] },
+  oblivion:      { name: '終焉', effect: 'fx_explosion',     target: 'allEnemies', shake: true, danger: true, desc: '相手全員が倒れる', effects: [{ type: 'annihilate' }] },
 };
+// 属性（element）：'fire'（炎）/ 'light'（光）。ゾンビは炎・光の攻撃で倒すと起き上がらない
+SKILLS.fireball.element = 'fire';
+SKILLS.inferno.element = 'fire';
 
 // ---------------------------------------------------------------------
 // 敵の特殊能力（部品）。敵の traits に { type: 'reflect', value: 0.3 } のように書くだけで使える
@@ -198,6 +286,41 @@ const TRAIT_INFO = {
   taunt:          { icon: '🏮', name: '誘いの光', desc: () => '相手の単体攻撃を自分に集める' },
   ethereal:       { icon: '👻', name: '霊体',     desc: t => `物理ダメージ-${pct(t.value)}（魔法の技は通常どおり）` },
   accelerate:     { icon: '⚙', name: '加速',     desc: t => `行動するたびに速度×${t.rate}（最大${t.max}倍）` },
+  // --- 51〜70階で追加 ---
+  reanimate:      { icon: '🧟', name: '起き上がり', desc: t => `倒されても${t.turns}ターン後にHP${pct(t.ratio)}で起き上がる（1回）。炎・光の攻撃で倒すと起き上がらない` },
+  stealBuff:      { icon: '🐦', name: '横取り',   desc: () => '攻撃した相手の強化効果を1つ奪って自分に付ける' },
+  healDown:       { icon: '💙', name: '青い炎',   desc: t => `この敵がいる間、相手の回復量-${pct(t.value)}` },
+  lifesteal:      { icon: '🩸', name: '吸収',     desc: t => `与えたダメージの${pct(t.value)}を回復` },
+  splitAt:        { icon: '🦇', name: '変身',     desc: t => `HP${pct(t.below)}以下になると、${ENEMIES[t.into].name}${t.count}体に分裂する（それぞれHP${pct(t.ratio)}）` },
+  phantom:        { icon: '🌫', name: '霊体',     desc: t => `通常攻撃のダメージ-${pct(t.value)}（スキルは通常どおり効く）` },
+  tombShield:     { icon: '🪦', name: '墓石の盾', desc: t => `仲間全員の受けるダメージ-${pct(t.value)}（自分が倒れると解除）` },
+  curseLink:      { icon: '🪡', name: '呪い返し', desc: t => `受けたダメージの${pct(t.value)}を、攻撃した相手とは別の相手1人にも与える` },
+  packFury:       { icon: '🐺', name: '仲間の仇', desc: t => `仲間が倒れるたびに攻撃+${pct(t.rate - 1)}` },
+  maxHpDown:      { icon: '🖤', name: '闇の剣',   desc: t => `攻撃した相手の最大HP-${pct(1 - t.rate)}（戦闘中ずっと。重ねがけ）` },
+  splitOnHit:     { icon: '💧', name: '分裂',     desc: t => `単体攻撃を受けるたびに、HPを半分に分けて分裂（最大${t.max}体）。全体攻撃なら分裂しない` },
+  merchant:       { icon: '💰', name: '商人',     desc: t => `攻撃してこない。${t.turns}回行動すると逃げる。逃げる前に倒すとポイント+${t.points}と上級アイテム1つ` },
+  mirrorCopy:     { icon: '🎭', name: '写し身',   desc: () => '戦闘開始時、攻撃力が一番高い相手の姿・ステータス・スキルをコピーする' },
+  // --- 71〜90階で追加 ---
+  snowballSplit:  { icon: '⛄', name: '雪玉分裂', desc: t => `倒されると${ENEMIES[t.into].name}${t.count}つに分かれ、${t.turns}ターン後に1つでも残っていれば復活する（1回）` },
+  packSpeed:      { icon: '🐺', name: '群れ',     desc: t => `同じ種類の仲間1体につき速度+${pct(t.rate)}` },
+  iceSlide:       { icon: '⛸', name: '氷の滑走', desc: t => `行動のあと${pct(t.chance)}で行動ゲージ+${pct(t.amount)}（連続行動することがある）` },
+  iceWall:        { icon: '🧊', name: '氷の壁',   desc: t => `${t.every}ターンごとに、仲間全員に「次の攻撃を1回無効」を付ける` },
+  auroraBless:    { icon: '🌈', name: 'オーロラ', desc: t => `毎ターン、仲間1体の攻撃・防御・速度のどれかを+${pct(t.rate - 1)}（3ターン）` },
+  starBless:      { icon: '🌟', name: '星の恵み', desc: () => '倒されると、相手側でHPの割合が一番低い1人のHPを全回復させる' },
+  stars:          { icon: '✨', name: '星の点',   desc: t => `体の星${t.count}つ。星1つにつき受けるダメージ-${pct(t.cut)}。会心を受けると星が1つ消える` },
+  hatch:          { icon: '🥚', name: '孵化',     desc: t => `攻撃しない。${t.turns}回行動すると「${ENEMIES[t.into].name}」になる` },
+  riftLink:       { icon: '🌀', name: '裂け目',   desc: () => '毎ターン敵を呼び出す。倒すと呼び出された敵も消える' },
+  noAct:          { icon: '⏸', name: '動かない', desc: () => '行動しない' },
+  // --- 神々の塔（91〜100階）で追加 ---
+  iaiCounter:     { icon: '⚔', name: '居合',     desc: t => `相手が行動するたび、その相手に必ず反撃する（${t.power}倍）` },
+  rampUp:         { icon: '🔥', name: '昂り',     desc: t => `毎ターン${STAT_LABELS[t.stat]}+${pct(t.rate - 1)}（最大${t.limit}倍）` },
+  startParts:     { icon: '🧩', name: '部位',     desc: t => `${ENEMIES[t.enemy].name}を${t.count}つ持つ` + (t.shield ? '（全部壊すまで本体は無敵）' : '') + (t.regrow ? `（壊れても${t.regrow}ターンで再生）` : '') },
+  nineLives:      { icon: '🦊', name: '九つの命', desc: t => `命が${t.count}つ。HPが0になるたび尾が1本減ってHP全回復（尾1本ごとにHP上限-${pct(t.hpCut)}）` },
+  coreBody:       { icon: '🛡', name: '機神の装甲', desc: () => 'コア以外への攻撃は効かない。コアは3ターンに1回、全体レーザーのあとに開く' },
+  hydraHead:      { icon: '🐍', name: '再生する首', desc: t => `単体攻撃で倒されると2本に増える（最大${t.max}本）。全体攻撃で倒すと増えない` },
+  chronoControl:  { icon: '⏳', name: '時の支配', desc: () => '毎ターン「相手1人の行動を飛ばす」か「自分が2回行動」のどちらかを使う' },
+  chronoRewind:   { icon: '⏪', name: '巻き戻し', desc: t => `HP${pct(t.below)}以下になると1回だけ、戦闘開始時のHPに戻る` },
+  oneShot:        { icon: '⚡', name: '一撃',     desc: () => '1回行動すると消える' },
 };
 
 // ---------------------------------------------------------------------
@@ -224,7 +347,27 @@ const STATUS_INFO = {
   sleep:         { icon: '💤', name: '眠り',     skipTurn: true, applyText: 'は眠ってしまった！', desc: () => '次の行動を1回休む' },
   focus:         { icon: '✨', name: '魔力集中', applyText: 'は魔力を集中している！',             desc: () => '次のスキルの効果が2倍' },
   counterStance: { icon: '🥋', name: '構え',     applyText: 'は構えた！',                         desc: () => '次に受ける攻撃に反撃する' },
+  // --- 51〜70階で追加 ---
+  // deathOnExpire: 残りターンが0になると即死
+  bound:  { icon: '🩹', name: '拘束', skipTurn: true, applyText: 'は包帯でしばられた！',     desc: () => '行動できない（攻撃されると解ける）' },
+  doom:   { icon: '💀', name: '死の宣告', deathOnExpire: true, applyText: 'に死の宣告が刻まれた！', desc: s => `あと${s.turns}回行動すると即死（リッチを倒すか回復で解除）` },
+  sealed: { icon: '🚫', name: '封印', applyText: 'はスキルを封じられた！',               desc: () => 'スキルが使えない（通常攻撃のみ）' },
+  // --- 71〜90階で追加 ---
+  iceWall:   { icon: '🧊', name: '氷の壁', applyText: 'は氷の壁に守られた！',      desc: () => '次に受ける攻撃を1回無効にする' },
+  entombed:  { icon: '🧊', name: '氷漬け', skipTurn: true, frozen: true, applyText: 'は氷漬けにされた！', desc: () => '行動できない（氷を壊すと助けられる）。絶対零度は効かない' },
+  foresight: { icon: '🔮', name: '星占い', applyText: 'は星の動きを読んでいる…',  desc: () => '次に受ける単体攻撃をかわして反撃する' },
+  voidVeil:  { icon: '👁', name: '部位の守り', invulnerable: true, applyText: 'は部位の力に守られた！', desc: () => '目・光の球などの部位を全部壊すまで攻撃が効かない' },
 };
+// --- 神々の塔（91〜100階）で追加 ---
+Object.assign(STATUS_INFO, {
+  inverted:     { icon: '🔄', name: '反転', applyText: 'は反転の呪いを受けた！', desc: () => '回復がダメージに変わる。受けたダメージは2ターン後に回復に変わる' },
+  armored:      { icon: '🛡', name: '機神の装甲', invulnerable: true, applyText: 'は装甲に包まれている。', desc: () => 'コア以外への攻撃は効かない' },
+  shut:         { icon: '🔒', name: '閉じたコア', invulnerable: true, applyText: 'が閉じた！', desc: () => '閉じている間は攻撃が効かない（全体レーザーのあとに開く）' },
+  rule_noHeal:  { icon: '🚫', name: '世界改変：回復禁止', applyText: 'が世界を書き換えた！ 回復が禁止された！', desc: () => 'だれもHPを回復できない' },
+  rule_noSkill: { icon: '🤐', name: '世界改変：スキル禁止', applyText: 'が世界を書き換えた！ スキルが禁止された！', desc: () => 'だれも通常攻撃以外の技を使えない' },
+  rule_reverse: { icon: '🔃', name: '世界改変：行動順逆転', applyText: 'が世界を書き換えた！ 行動順が逆転した！', desc: () => '遅いキャラほど先に行動する' },
+});
+STATUS_INFO.freeze.frozen = true; // 凍結中は絶対零度が効かない
 
 // 強化のうち、キャラの上にアイコンで出すもの（tag で判別。数字は残りターン）
 const BUFF_BADGES = {
@@ -305,7 +448,7 @@ const CHARACTERS = {
     ],
   },
   priest: {
-    name: '僧侶', attackEffect: 'fx_impact', role: 'healer', image: 'characters/priest.png', hp: 140, atk: 16, def: 12, spd: 110,
+    name: '僧侶', attackEffect: 'fx_impact', attackElement: 'light', role: 'healer', image: 'characters/priest.png', hp: 140, atk: 16, def: 12, spd: 110,
     join: { defeatBoss: 10 },
     skills: ['attack', 'heal', 'healAll'],
     autoRules: [
@@ -327,7 +470,7 @@ const CHARACTERS = {
     ],
   },
   mage: {
-    name: '魔法使い', attackEffect: 'fx_fire', role: 'aoe', image: 'characters/mage.png', hp: 120, atk: 34, def: 10, spd: 90,
+    name: '魔法使い', attackEffect: 'fx_fire', attackElement: 'fire', role: 'aoe', image: 'characters/mage.png', hp: 120, atk: 34, def: 10, spd: 90,
     join: { defeatBoss: 20 },
     skills: ['attack', 'defend', 'fireball', 'inferno', 'focus'],
     autoRules: [
@@ -381,7 +524,7 @@ const CHARACTERS = {
 };
 
 // オートバトルで敵1体を狙うときの優先順（敵のタイプ）。どれもいなければ残りHPが一番少ない敵
-const TARGET_PRIORITY = ['heal', 'charge'];
+const TARGET_PRIORITY = ['treasure', 'heal', 'charge'];
 
 // ---------------------------------------------------------------------
 // 成長・ポイントの設定
@@ -435,6 +578,13 @@ const PROGRESSION = {
 //   countdown: { skill, turns } 大技を予告 / timeStop: true 相手全員の行動ゲージを0に戻す
 //   turnAura: { status, value, turns } 自分の毎ターン開始時に、相手全員を状態異常にする
 //   turnDebuff: { stat, rate, limit, tag, label } 自分の毎ターン開始時に、相手全員の能力を下げる（重ねがけ。limit 倍まで）
+//   turnShuffle: true 自分の毎ターン開始時に、行動順をランダムに入れ替える
+//   debuffAll: { stat, rate, turns } 相手全員の能力を下げる（1回）
+//   eyes: { enemy, count } 目を呼び出し、全部壊すまで本体は無敵（場の上限を超えて出る）
+//   parts: { enemy, count, shield } 部位を呼び出す（shield: true なら全部壊すまで本体は無敵）
+//   worldRule: { every: 3 } 自分が every 回動くごとに、ルール（回復禁止／スキル禁止／行動順逆転）を変える
+// pack: 2  この敵が出たら、同じ敵が最低この数そろって出る（群れ）
+// hint: 図鑑の「出現場所」に出す説明（ほかの敵から出てくる敵など）
 // ai:   行動の候補リスト。条件(when)を満たす候補の中から weight の比率でランダムに選ぶ
 //   when に使える条件（すべて満たしたときのみ候補になる）:
 //     hpBelow: 0.5      自分のHPが50%未満
@@ -444,6 +594,11 @@ const PROGRESSION = {
 //     hasStatus / notStatus: 'flying' その状態異常がかかっている／いない
 //     noCountdown: true               大技を予告中でない
 //     allyHpBelow: 0.7  HP70%未満の仲間（自分含む）がいる（allyCount: 2 を添えると「2人以上」）
+//     notBossBattle: true            ボス戦ではない
+//     noOpponentStatus: 'doom'       その状態異常の相手が1人もいない
+//     everyNth: 3                    3回に1回（自分の3回目・6回目…の行動）
+//     hasParts: true                 自分の部位（足など）が残っている
+//     noSummonAlive: true            自分が呼び出した敵が残っていない
 //     ※ 条件の一覧は 味方の autoRules の説明も参照（同じ条件が使える）
 //   候補が1つも無いときは「攻撃」をする
 const ENEMIES = {
@@ -542,6 +697,110 @@ const ENEMIES = {
   skyWitch:     { name: '天空の魔女',     type: 'disrupt', image: 'enemies/sky_witch.png',     idle: 'idle-float',  face: '50% 30%', hp: 120, atk: 34, def: 16, spd: 115, exp: 70,
                   ai: [{ skill: 'attack', weight: 1 }, { skill: 'timeMagic', weight: 2 }] },
 
+  // --- 冥府の墓地（51〜59階） ---
+  zombie:       { name: 'ゾンビ',         type: 'normal',  image: 'enemies/zombie.png',        idle: 'idle-sway',   face: '50% 20%', hp: 160, atk: 30, def: 18, spd: 60,  exp: 78,
+                  traits: [{ type: 'reanimate', turns: 2, ratio: 0.3 }], ai: [{ skill: 'attack', weight: 1 }] },
+  reaper:       { name: '死神', attackEffect: 'fx_slash', type: 'fast', image: 'enemies/reaper.png',     idle: 'idle-float',  face: '45% 30%', hp: 120, atk: 36, def: 14, spd: 110, exp: 86,
+                  ai: [{ skill: 'deathScythe', weight: 100, when: { enemyHpBelow: 0.25, notBossBattle: true } }, { skill: 'attack', weight: 1 }] },
+  graveCrow:    { name: '墓場のカラス',   type: 'fast',    image: 'enemies/grave_crow.png',    idle: 'idle-flap',   face: '60% 35%', hp: 80,  atk: 24, def: 10, spd: 170, exp: 76,
+                  traits: [{ type: 'stealBuff' }], ai: [{ skill: 'attack', weight: 1 }] },
+  lanternGhost: { name: 'ランタンゴースト', attackEffect: 'fx_fire', type: 'disrupt', image: 'enemies/lantern_ghost.png', idle: 'idle-float', face: '45% 30%', hp: 90, atk: 20, def: 12, spd: 100, exp: 78,
+                  traits: [{ type: 'healDown', value: 0.5 }], ai: [{ skill: 'attack', weight: 1 }] },
+  mummy:        { name: 'ミイラ',         type: 'disrupt', image: 'enemies/mummy.png',         idle: 'idle-sway',   face: '50% 20%', hp: 170, atk: 28, def: 22, spd: 75,  exp: 84,
+                  ai: [{ skill: 'attack', weight: 2 }, { skill: 'bandageBind', weight: 1 }] },
+  vampire:      { name: '吸血鬼',         type: 'normal',  image: 'enemies/vampire.png',       idle: 'idle-breath', face: '50% 20%', hp: 150, atk: 34, def: 20, spd: 120, exp: 92,
+                  traits: [{ type: 'lifesteal', value: 0.5 }, { type: 'splitAt', below: 0.5, into: 'vampBat', count: 3, ratio: 0.3 }], ai: [{ skill: 'attack', weight: 1 }] },
+  vampBat:      { name: 'コウモリ',       type: 'fast',    image: 'enemies/bat.svg',           idle: 'idle-flap',   face: '50% 45%', size: 'small', noElite: true, hp: 40, atk: 22, def: 8, spd: 160, exp: 6,
+                  ai: [{ skill: 'attack', weight: 1 }] },
+  ghost:        { name: 'ゴースト',       type: 'fast',    image: 'enemies/ghost.png',         idle: 'idle-float',  face: '50% 35%', hp: 100, atk: 28, def: 10, spd: 110, exp: 80,
+                  traits: [{ type: 'phantom', value: 0.9 }], ai: [{ skill: 'attack', weight: 1 }] },
+  tombGolem:    { name: '墓守ゴーレム',   type: 'tough',   image: 'enemies/tomb_golem.png',    idle: 'idle-heavy',  face: '50% 25%', hp: 240, atk: 26, def: 44, spd: 50,  exp: 90,
+                  traits: [{ type: 'tombShield', value: 0.3 }], ai: [{ skill: 'attack', weight: 1 }] },
+  cursedDoll:   { name: '呪いの人形',     type: 'disrupt', image: 'enemies/cursed_doll.png',   idle: 'idle-sway',   face: '50% 25%', hp: 110, atk: 22, def: 14, spd: 105, exp: 82,
+                  traits: [{ type: 'curseLink', value: 0.5 }], ai: [{ skill: 'attack', weight: 1 }] },
+
+  // --- 魔界の城（61〜69階） ---
+  imp:          { name: 'インプ',         type: 'disrupt', image: 'enemies/imp.png',           idle: 'idle-flap',   face: '50% 30%', hp: 90,  atk: 30, def: 12, spd: 160, exp: 96,
+                  ai: [{ skill: 'attack', weight: 2 }, { skill: 'mischief', weight: 2 }] },
+  evilEye:      { name: '魔眼',           type: 'disrupt', image: 'enemies/evil_eye.png',      idle: 'idle-float',  face: '50% 40%', hp: 120, atk: 26, def: 16, spd: 110, exp: 98,
+                  ai: [{ skill: 'attack', weight: 1 }, { skill: 'glare', weight: 2, when: { noOpponentStatus: 'sealed' } }] },
+  hellhound:    { name: 'ヘルハウンド', attackEffect: 'fx_fire', type: 'fast', image: 'enemies/hellhound.png', idle: 'idle-breath', face: '80% 40%', hp: 150, atk: 38, def: 18, spd: 150, exp: 104,
+                  traits: [{ type: 'packFury', rate: 1.3 }], ai: [{ skill: 'tripleBite', weight: 1 }] },
+  demonKnight:  { name: '悪魔騎士', attackEffect: 'fx_slash', type: 'tough', image: 'enemies/demon_knight.png', idle: 'idle-heavy', face: '50% 20%', hp: 220, atk: 42, def: 36, spd: 90, exp: 112,
+                  traits: [{ type: 'maxHpDown', rate: 0.9 }], ai: [{ skill: 'attack', weight: 1 }] },
+  darkSlime:    { name: '闇スライム',     type: 'normal',  image: 'enemies/dark_slime.png',    idle: 'idle-puni',   face: '50% 60%', hp: 140, atk: 30, def: 20, spd: 80,  exp: 100,
+                  traits: [{ type: 'splitOnHit', max: 4 }], ai: [{ skill: 'attack', weight: 1 }] },
+  devilMerchant:{ name: '悪魔の商人',     type: 'treasure', image: 'enemies/devil_merchant.png', idle: 'idle-sway', face: '40% 30%', noElite: true, hp: 200, atk: 10, def: 30, spd: 100, exp: 60,
+                  traits: [{ type: 'merchant', turns: 3, points: 10 }], ai: [{ skill: 'haggle', weight: 1 }] },
+  minotaur:     { name: 'ミノタウロス', attackEffect: 'fx_slash', type: 'charge', image: 'enemies/minotaur.png', idle: 'idle-heavy', face: '45% 20%', hp: 280, atk: 46, def: 30, spd: 70, exp: 118,
+                  ai: [{ skill: 'attack', weight: 2 }, { skill: 'rush', weight: 1 }] },
+  grimoire:     { name: '魔導書',         type: 'disrupt', image: 'enemies/grimoire.png',      idle: 'idle-float',  face: '50% 30%', hp: 110, atk: 36, def: 12, spd: 120, exp: 104,
+                  ai: [{ skill: 'darkSpell', weight: 1 }, { skill: 'mendPage', weight: 1 }, { skill: 'slowPage', weight: 1 }] },
+  mirrorDemon:  { name: '鏡の悪魔',       type: 'special', image: 'enemies/mirror_demon.png',  idle: 'idle-float',  face: '50% 35%', noElite: true, hp: 160, atk: 30, def: 24, spd: 100, exp: 110,
+                  traits: [{ type: 'mirrorCopy' }], ai: [{ skill: 'attack', weight: 1 }] },
+
+  // --- 凍てつく氷河（71〜79階） ---
+  snowmanSoldier: { name: '雪だるま兵', attackEffect: 'fx_slash', type: 'tough', image: 'enemies/snowman_soldier.png', idle: 'idle-heavy', face: '50% 30%', hp: 200, atk: 40, def: 30, spd: 80, exp: 132,
+                    traits: [{ type: 'snowballSplit', into: 'snowball', count: 3, turns: 2, ratio: 0.5 }], ai: [{ skill: 'attack', weight: 1 }] },
+  snowball:       { name: '雪玉', type: 'normal', image: 'enemies/snowman_soldier.png', idle: 'idle-puni', face: '50% 30%', size: 'small', noElite: true, hint: '雪だるま兵が倒れると出現',
+                    hp: 50, atk: 16, def: 20, spd: 70, exp: 0, ai: [{ skill: 'attack', weight: 1 }] },
+  frostWolf:      { name: '氷狼', attackEffect: 'fx_ice',   type: 'fast',  image: 'enemies/frost_wolf.png',   idle: 'idle-breath', face: '80% 35%', pack: 2, hp: 180, atk: 48, def: 22, spd: 160, exp: 136,
+                    traits: [{ type: 'packSpeed', rate: 0.1 }], ai: [{ skill: 'attack', weight: 1 }] },
+  penguinKnight:  { name: 'ペンギン騎士', attackEffect: 'fx_slash', type: 'normal', image: 'enemies/penguin_knight.png', idle: 'idle-sway', face: '50% 25%', hp: 220, atk: 44, def: 40, spd: 100, exp: 138,
+                    traits: [{ type: 'iceSlide', chance: 0.3, amount: 0.5 }], ai: [{ skill: 'attack', weight: 1 }] },
+  crystalGolem:   { name: '氷晶ゴーレム',   type: 'tough',   image: 'enemies/crystal_golem.png', idle: 'idle-heavy',  face: '50% 22%', hp: 320, atk: 40, def: 60, spd: 50,  exp: 146,
+                    traits: [{ type: 'iceWall', every: 3 }], ai: [{ skill: 'attack', weight: 1 }] },
+  snowSpirit:     { name: '雪の精',         type: 'disrupt', image: 'enemies/snow_spirit.png',   idle: 'idle-float',  face: '50% 25%', hp: 160, atk: 36, def: 20, spd: 120, exp: 134,
+                    ai: [{ skill: 'attack', weight: 1 }, { skill: 'blizzard', weight: 2 }] },
+  iceDrake:       { name: '氷竜の子', attackEffect: 'fx_ice', type: 'fast', image: 'enemies/ice_drake.png',    idle: 'idle-flap',   face: '50% 35%', hp: 200, atk: 50, def: 26, spd: 110, exp: 142,
+                    ai: [{ skill: 'attack', weight: 2 }, { skill: 'freezingBreath', weight: 2 }] },
+  mammoth:        { name: 'マンモス',       type: 'tough',   image: 'enemies/mammoth.png',       idle: 'idle-heavy',  face: '50% 40%', hp: 400, atk: 56, def: 44, spd: 60,  exp: 156,
+                    ai: [{ skill: 'attack', weight: 2 }, { skill: 'quakeStomp', weight: 1 }] },
+  yeti:           { name: 'イエティ',       type: 'charge',  image: 'enemies/yeti.png',          idle: 'idle-heavy',  face: '45% 30%', hp: 300, atk: 58, def: 30, spd: 90,  exp: 152,
+                    traits: [{ type: 'enrageAt', below: 0.5, rate: 1.5 }], ai: [{ skill: 'attack', weight: 1 }, { skill: 'snowballThrow', weight: 2 }] },
+  auroraWisp:     { name: 'オーロラの精',   type: 'heal',    image: 'enemies/aurora_wisp.png',   idle: 'idle-float',  face: '50% 50%', hp: 140, atk: 30, def: 16, spd: 140, exp: 140,
+                    traits: [{ type: 'auroraBless', rate: 1.2 }], ai: [{ skill: 'attack', weight: 1 }] },
+  iceBlock:       { name: '氷塊', type: 'tough', image: 'enemies/crystal_golem.png', idle: 'idle-heavy', face: '50% 22%', size: 'small', noElite: true, hint: '氷河の巨人の「氷漬け」で出現',
+                    hp: 120, atk: 1, def: 30, spd: 60, exp: 0, traits: [{ type: 'noAct' }], ai: [{ skill: 'idle', weight: 1 }] },
+
+  // --- 星の神殿（81〜89階） ---
+  starShard:      { name: '星の欠片',       type: 'fast',    image: 'enemies/star_shard.png',    idle: 'idle-float',  face: '50% 45%', hp: 160, atk: 40, def: 20, spd: 150, exp: 160,
+                    traits: [{ type: 'starBless' }], ai: [{ skill: 'attack', weight: 1 }] },
+  meteorGolem:    { name: '隕石ゴーレム', attackEffect: 'fx_explosion', type: 'charge', image: 'enemies/meteor_golem.png', idle: 'idle-heavy', face: '50% 45%', hp: 360, atk: 60, def: 50, spd: 60, exp: 178,
+                    ai: [{ skill: 'meteorFall', weight: 100, when: { everyNth: 3 } }, { skill: 'attack', weight: 1 }] },
+  moonRabbit:     { name: '月兎兵',         type: 'heal',    image: 'enemies/moon_rabbit.png',   idle: 'idle-sway',   face: '50% 20%', hp: 240, atk: 52, def: 34, spd: 130, exp: 170,
+                    ai: [{ skill: 'attack', weight: 2 }, { skill: 'mochi', weight: 2 }] },
+  astrologer:     { name: '星読みの魔術師', attackEffect: 'fx_thunder', type: 'disrupt', image: 'enemies/astrologer.png', idle: 'idle-float', face: '50% 30%', hp: 200, atk: 56, def: 22, spd: 120, exp: 172,
+                    ai: [{ skill: 'attack', weight: 2 }, { skill: 'starReading', weight: 2, when: { notStatus: 'foresight' } }] },
+  mechaAngel:     { name: '機械天使', attackEffect: 'fx_thunder', type: 'normal', image: 'enemies/mecha_angel.png', idle: 'idle-float', face: '50% 22%', hp: 280, atk: 58, def: 44, spd: 110, exp: 180,
+                    traits: [{ type: 'rebirth', ratio: 0.5, label: '再起動', text: 'は再起動した！' }], ai: [{ skill: 'attack', weight: 2 }, { skill: 'laser', weight: 1 }] },
+  voidOrb:        { name: '虚無の卵',       type: 'charge',  image: 'enemies/void_orb.png',      idle: 'idle-float',  face: '50% 45%', hp: 260, atk: 0, def: 40, spd: 40, exp: 176,
+                    traits: [{ type: 'hatch', turns: 5, into: 'voidSpawn' }], ai: [{ skill: 'idle', weight: 1 }] },
+  voidSpawn:      { name: '虚神の眷属', attackEffect: 'fx_dark', type: 'charge', image: 'enemies/void_orb.png', idle: 'idle-float', face: '50% 45%', noElite: true, hint: '虚無の卵が孵化すると出現',
+                    hp: 520, atk: 64, def: 80, spd: 80, exp: 0, ai: [{ skill: 'attack', weight: 2 }, { skill: 'voidTentacles', weight: 1 }] },
+  rift:           { name: '次元の裂け目',   type: 'special', image: 'enemies/rift.png',          idle: 'idle-sway',   face: '50% 40%', hp: 300, atk: 0, def: 30, spd: 100, exp: 182,
+                    traits: [{ type: 'riftLink' }], ai: [{ skill: 'riftSummon', weight: 1 }] },
+  constellationBeast: { name: '星座の獣', type: 'tough',   image: 'enemies/constellation_beast.png', idle: 'idle-breath', face: '80% 35%', hp: 260, atk: 60, def: 26, spd: 140, exp: 184,
+                    traits: [{ type: 'stars', count: 5, cut: 0.15 }], ai: [{ skill: 'attack', weight: 1 }] },
+  timeWarden:     { name: '時空の番人',     type: 'tough',   image: 'enemies/time_warden.png',   idle: 'idle-heavy',  face: '50% 20%', hp: 340, atk: 54, def: 52, spd: 90,  exp: 186,
+                    ai: [{ skill: 'reverseTime', weight: 100, when: { hpBelow: 0.5 } }, { skill: 'attack', weight: 1 }] },
+  voidEye:        { name: '虚神の目', attackEffect: 'fx_dark', type: 'special', image: 'enemies/evil_eye.png', idle: 'idle-float', face: '50% 40%', size: 'small', noElite: true, hint: '星喰らいの虚神が呼び出す',
+                    hp: 300, atk: 1, def: 30, spd: 60, exp: 0, traits: [{ type: 'noAct' }], ai: [{ skill: 'idle', weight: 1 }] },
+
+  // --- 神々の塔の部位・呼び出し（part: true ＝ 小さいHPバーつきの別ターゲット。オートで優先して狙う）---
+  // autoAvoid: true ならオートでは後回し（倒すと増えるヒュドラの首など）
+  // coreLink: true ならダメージは本体に入る（機神のコア）
+  krakenLeg:  { name: '足', type: 'special', image: 'enemies/kraken.png', idle: 'idle-sway', face: '50% 80%', size: 'small', part: true, noElite: true, hint: '深淵のクラーケンの部位',
+                hp: 400, atk: 1, def: 40, spd: 60, exp: 0, traits: [{ type: 'noAct' }], ai: [{ skill: 'idle', weight: 1 }] },
+  thunderDrum:{ name: '雷の太鼓', type: 'special', image: 'enemies/thunder_emperor.png', face: '50% 30%', hidden: true, noElite: true, hint: '雷帝の太鼓（行動順リストにだけ出る）',
+                hp: 1, atk: 100, def: 1, spd: 100, exp: 0, traits: [{ type: 'oneShot' }], ai: [{ skill: 'drumStrike', weight: 1 }] },
+  machineCore:{ name: 'コア', type: 'special', image: 'enemies/machine_god.png', idle: 'idle-breath', face: '50% 50%', size: 'small', part: true, coreLink: true, noElite: true, hint: '機神の部位',
+                hp: 1, atk: 1, def: 1, spd: 60, exp: 0, traits: [{ type: 'noAct' }], ai: [{ skill: 'idle', weight: 1 }] },
+  hydraHead:  { name: '首', attackEffect: 'fx_poison', type: 'special', image: 'enemies/hydra.png', idle: 'idle-sway', face: '50% 15%', size: 'small', part: true, autoAvoid: true, noElite: true, hint: '魔竜ヒュドラの部位',
+                hp: 700, atk: 70, def: 40, spd: 110, exp: 0, traits: [{ type: 'hydraHead', max: 7 }], ai: [{ skill: 'headBite', weight: 1 }] },
+  lightOrb:   { name: '光の球', type: 'special', image: 'enemies/origin.png', idle: 'idle-float', face: '50% 40%', size: 'small', part: true, noElite: true, hint: '終焉の神オリジンの部位',
+                hp: 900, atk: 1, def: 50, spd: 60, exp: 0, traits: [{ type: 'noAct' }], ai: [{ skill: 'idle', weight: 1 }] },
+
   // --- ボス ---
   golem:   { name: 'ゴーレム王', attackEffect: 'fx_impact',   type: 'boss',    image: 'enemies/golem_king.svg',    idle: 'idle-heavy',  enrageBelow: 0.5, hp: 520, atk: 26, def: 22, spd: 85,  exp: 120, ai: [
     // HP50%以上：様子見の攻撃と防御強化
@@ -617,6 +876,112 @@ const ENEMIES = {
       { skill: 'skyBarrier', weight: 1, when: { notStatus: 'barrier' } },
       { skill: 'lightRain',  weight: 2, when: { hpBelow: 0.7 } },
     ] },
+
+  // 60階ボス
+  lichKing: { name: '冥王リッチ', attackEffect: 'fx_dark', type: 'boss', image: 'enemies/lich_king.png', idle: 'idle-float', face: '45% 25%', hp: 2400, atk: 54, def: 42, spd: 115, exp: 2000,
+    phases: [
+      { below: 0.6, speech: 'その魂…いただくとしよう。', shake: true,
+        message: '冥王リッチが「魂吸収」を使うようになった！' },
+      { below: 0.3, speech: '死の宣告を受けよ…逃れられはせぬ。', shake: true, enrage: true,
+        message: '冥王リッチが「死の宣告」を使うようになった！ 宣告されたら、3回行動する前にリッチを倒すか回復で解除しよう！' },
+    ],
+    ai: [
+      { skill: 'soulArrow',     weight: 3 },
+      { skill: 'raiseDead',     weight: 1 },
+      { skill: 'soulDrain',     weight: 2, when: { hpBelow: 0.6 } },
+      { skill: 'deathSentence', weight: 100, when: { hpBelow: 0.3, noOpponentStatus: 'doom' } },
+    ] },
+
+  // 70階 最終ボス
+  demonLord: { name: '魔王ディアボロス', attackEffect: 'fx_slash', type: 'boss', image: 'enemies/demon_lord.png', idle: 'idle-heavy', face: '50% 25%', hp: 3200, atk: 62, def: 48, spd: 125, exp: 2800,
+    phases: [
+      { below: 0.7, speech: '映し身どもよ、我が前に立て！', shake: true, summon: { enemy: 'mirrorDemon', count: 2 } },
+      { below: 0.4, speech: '時の流れなど、我が手の内よ…', shake: true, turnShuffle: true,
+        message: '魔界の時が狂いはじめた！ 魔王が動くたびに行動順が入れ替わる！' },
+      { below: 0.15, speech: '見るがいい…魔界の王の真の姿を！ すべてを終焉の炎で焼き尽くしてくれる！', shake: true, enrage: true,
+        message: '魔王ディアボロスが最終形態になった！ 1ターンに2回行動し、攻撃が50%上がった！',
+        buffs: [{ stat: 'atk', rate: 1.5 }], actionsPerTurn: 2, countdown: { skill: 'endFlame', turns: 3 } },
+    ],
+    ai: [
+      { skill: 'demonSword', weight: 3 },
+      { skill: 'darkWave',   weight: 2 },
+    ] },
+
+  // 80階ボス
+  frostGiant: { name: '氷河の巨人', attackEffect: 'fx_ice', type: 'boss', image: 'enemies/frost_giant.png', idle: 'idle-heavy', face: '50% 25%', hp: 4200, atk: 70, def: 58, spd: 100, exp: 3800,
+    phases: [
+      { below: 0.6, speech: '凍りつけ…永遠にな。', shake: true,
+        message: '氷河の巨人が「氷漬け」を使うようになった！ 氷塊を壊せば仲間を助けられる！' },
+      { below: 0.25, speech: 'すべてを止めてやろう…絶対零度でな！', shake: true, enrage: true,
+        message: '氷河の巨人が絶対零度の力をためはじめた！ 凍結・氷漬けの仲間には効かない！',
+        countdown: { skill: 'absoluteZero', turns: 3 } },
+    ],
+    ai: [
+      { skill: 'iceClub',      weight: 3 },
+      { skill: 'glacierPress', weight: 2 },
+      { skill: 'iceEntomb',    weight: 3, when: { hpBelow: 0.6, noOpponentStatus: 'entombed' } },
+    ] },
+
+  // 90階ボス
+  voidGod: { name: '星喰らいの虚神', attackEffect: 'fx_dark', type: 'boss', image: 'enemies/void_god.png', idle: 'idle-float', face: '50% 45%', hp: 5500, atk: 78, def: 60, spd: 120, exp: 5000,
+    phases: [
+      { below: 0.6, speech: '星々よ、我がもとへ墜ちよ…重力崩壊！', shake: true,
+        message: '重力崩壊！ 味方全員の速度が半分になった！（3ターン）',
+        debuffAll: { stat: 'spd', rate: 0.5, turns: 3 } },
+      { below: 0.3, speech: '見よ…七つの眼が開く。', shake: true, enrage: true,
+        message: '虚神の目が7つ開いた！ 目を全部壊すまで本体には攻撃が効かない！ 目が残っていると毎ターン全体攻撃が来る！',
+        eyes: { enemy: 'voidEye', count: 7 } },
+    ],
+    ai: [
+      { skill: 'eyeBeam',       weight: 100, when: { hasStatus: 'voidVeil' } },
+      { skill: 'voidTentacles', weight: 3, when: { notStatus: 'voidVeil' } },
+      { skill: 'starEater',     weight: 2, when: { notStatus: 'voidVeil' } },
+    ] },
+
+  // ---- 神々の塔（91〜99階は1階に1体ずつボス、100階は終焉の神） ----
+  swordSaint: { name: '剣聖の亡霊', attackEffect: 'fx_slash', type: 'boss', image: 'enemies/sword_saint.png', idle: 'idle-float', face: '50% 25%', hp: 6000, atk: 90, def: 50, spd: 170, exp: 6000,
+    traits: [{ type: 'iaiCounter', power: 0.8 }],
+    ai: [{ skill: 'attack', weight: 2 }, { skill: 'issen', weight: 1 }] },
+  infernoDragon: { name: '炎獄竜', attackEffect: 'fx_fire', type: 'boss', image: 'enemies/inferno_dragon.png', idle: 'idle-heavy', face: '50% 25%', hp: 7000, atk: 96, def: 60, spd: 120, exp: 6200,
+    traits: [{ type: 'rampUp', stat: 'atk', rate: 1.05, limit: 3 }],
+    ai: [{ skill: 'dragonClaw', weight: 2 }, { skill: 'hellfire', weight: 2 }] },
+  kraken: { name: '深淵のクラーケン', type: 'boss', image: 'enemies/kraken.png', idle: 'idle-sway', face: '50% 35%', hp: 7500, atk: 88, def: 56, spd: 100, exp: 6400,
+    traits: [{ type: 'startParts', enemy: 'krakenLeg', count: 8, regrow: 3 }],
+    ai: [{ skill: 'tentacleBarrage', weight: 3, when: { hasParts: true } }, { skill: 'krakenSlam', weight: 1 }] },
+  thunderEmperor: { name: '雷帝', attackEffect: 'fx_thunder', type: 'boss', image: 'enemies/thunder_emperor.png', idle: 'idle-float', face: '50% 30%', hp: 7000, atk: 100, def: 56, spd: 150, exp: 6600,
+    ai: [{ skill: 'thunderDrums', weight: 3 }, { skill: 'thunderSpear', weight: 2 }, { skill: 'attack', weight: 1 }] },
+  nineTails: { name: '九尾の狐', attackEffect: 'fx_fire', type: 'boss', image: 'enemies/nine_tails.png', idle: 'idle-breath', face: '50% 25%', hp: 6500, atk: 92, def: 48, spd: 180, exp: 6800,
+    traits: [{ type: 'nineLives', count: 9, hpCut: 0.1 }],
+    ai: [{ skill: 'foxBite', weight: 2 }, { skill: 'foxFire', weight: 2 }] },
+  machineGod: { name: '機神', type: 'boss', image: 'enemies/machine_god.png', idle: 'idle-heavy', face: '50% 25%', hp: 9000, atk: 100, def: 80, spd: 90, exp: 7200,
+    traits: [{ type: 'coreBody' }, { type: 'startParts', enemy: 'machineCore', count: 1 }],
+    ai: [{ skill: 'coreLaser', weight: 100, when: { everyNth: 3 } }, { skill: 'mechPunch', weight: 2 }, { skill: 'laser', weight: 1 }] },
+  hydra: { name: '魔竜ヒュドラ', attackEffect: 'fx_poison', type: 'boss', image: 'enemies/hydra.png', idle: 'idle-heavy', face: '50% 15%', hp: 8000, atk: 96, def: 58, spd: 110, exp: 7400,
+    traits: [{ type: 'startParts', enemy: 'hydraHead', count: 3 }],
+    ai: [{ skill: 'dragonClaw', weight: 2 }, { skill: 'hydraBreath', weight: 1 }] },
+  fallenAngel: { name: '堕天使', attackEffect: 'fx_dark', type: 'boss', image: 'enemies/fallen_angel.png', idle: 'idle-float', face: '50% 25%', hp: 8500, atk: 104, def: 62, spd: 160, exp: 7800,
+    ai: [{ skill: 'inversion', weight: 3, when: { noOpponentStatus: 'inverted' } }, { skill: 'fallenSpear', weight: 3 }, { skill: 'darkFeathers', weight: 2 }] },
+  chronos: { name: '時の神クロノス', attackEffect: 'fx_time', type: 'boss', image: 'enemies/chronos.png', idle: 'idle-float', face: '50% 30%', hp: 9500, atk: 100, def: 66, spd: 140, exp: 8400,
+    traits: [{ type: 'chronoControl' }, { type: 'chronoRewind', below: 0.3 }],
+    ai: [{ skill: 'chronoBlade', weight: 3 }, { skill: 'timeWave', weight: 2 }] },
+
+  // 100階 真の最終ボス
+  origin: { name: '終焉の神オリジン', attackEffect: 'fx_explosion', type: 'boss', image: 'enemies/origin.png', idle: 'idle-float', face: '50% 25%', hp: 15000, atk: 120, def: 80, spd: 160, exp: 20000,
+    phases: [
+      { below: 0.75, speech: 'この世界の理など、我が手でいくらでも書き換えられる。', shake: true,
+        message: '世界改変がはじまった！ オリジンが3回動くごとにルールが変わる！', worldRule: { every: 3 } },
+      { below: 0.5, speech: '四つの光よ、我を護れ。', shake: true,
+        message: '4つの腕に光の球が宿った！ 球を全部壊すまで本体にダメージが通らない！',
+        parts: { enemy: 'lightOrb', count: 4, shield: true } },
+      { below: 0.25, speech: 'すべては無へ還る…終焉の時を数えよ。', shake: true, enrage: true,
+        message: '終焉のカウントダウンが始まった！ 0になると全滅する！ 1ターンに2回行動し、攻撃が50%上がった！',
+        buffs: [{ stat: 'atk', rate: 1.5 }], actionsPerTurn: 2, countdown: { skill: 'oblivion', turns: 10 } },
+    ],
+    ai: [
+      { skill: 'genesisLight',   weight: 3 },
+      { skill: 'summonPastBoss', weight: 2, when: { noSummonAlive: true } },
+      { skill: 'originStrike',   weight: 2 },
+    ] },
 };
 
 // ---------------------------------------------------------------------
@@ -627,6 +992,7 @@ const DUNGEON = {
   enemyCount: [
     { from: 1,  min: 1, max: 3 },
     { from: 11, min: 2, max: 4 },
+    { from: 101, min: 3, max: 4 },   // 無限モード
   ],
   maxEnemies: 6,                   // 分裂・召喚を含めて、場に出られる敵の最大数
   bossEvery: 10,                   // 何階ごとにボス階か
@@ -637,10 +1003,32 @@ const DUNGEON = {
     30: ['ignis'],
     40: ['leviathan'],
     50: ['zenith'],
+    60: ['lichKing'],
+    70: ['demonLord'],
+    80: ['frostGiant'],
+    90: ['voidGod'],
+    // 神々の塔：91〜99階は1階に1体ずつボス
+    91: ['swordSaint'], 92: ['infernoDragon'], 93: ['kraken'], 94: ['thunderEmperor'], 95: ['nineTails'],
+    96: ['machineGod'], 97: ['hydra'], 98: ['fallenAngel'], 99: ['chronos'],
+    100: ['origin'],
   },
-  finalFloor: 50,                  // 最終ボスの階（倒すとエンディング）。これより先は無限モード
-  // 無限モード（finalFloor より先）のボス階に、順番に登場するボス（階層補正で強くなって出る）
-  endlessBosses: ['golem', 'dragon', 'ignis', 'leviathan', 'zenith'],
+  // 神々の塔：この範囲の階はすべてボス階（クリアでチェックポイント更新＋上級アイテム）
+  // 全滅するたびに、次からその階のボスのHPが wipeHpCut ずつ下がる（最大 wipeHpCutMax まで。救済措置）
+  tower: { from: 91, to: 100, wipeHpCut: 0.1, wipeHpCutMax: 0.5 },
+  // 「第○部クリア」の演出だけ出して、そのまま先へ進む階
+  partClears: {
+    50: { title: '第一部 クリア！', sub: '― 物語は冥府の底へ ―', boss: '天空王ゼニス',
+          text: '天空王ゼニスは光の中に消えた。<br>しかしその瞬間、地の底から冷たい風が吹き上げてきた…。',
+          note: '51階からは「冥府の墓地」と「魔界の城」。' },
+    70: { title: '第二部 クリア！', sub: '― 物語は氷と星の彼方へ ―', boss: '魔王ディアボロス',
+          text: '魔王ディアボロスは終焉の炎とともに崩れ落ちた。<br>だが、空の彼方で、凍てつく風と星々がざわめいている…。',
+          note: '71階からは「凍てつく氷河」「星の神殿」、そして「神々の塔」。' },
+  },
+  finalFloor: 100,                 // エンディングの階（終焉の神を倒すと真のエンディング。そのあとも冒険は続けられる）
+  endlessFrom: 101,                // この階から無限モード（決まったエリアが終わった次の階）
+  // 無限モードのボス階に、順番に登場するボス（階層補正で強くなって出る）
+  endlessBosses: ['golem', 'dragon', 'ignis', 'leviathan', 'zenith', 'lichKing', 'demonLord', 'frostGiant', 'voidGod',
+    'swordSaint', 'infernoDragon', 'kraken', 'thunderEmperor', 'nineTails', 'machineGod', 'hydra', 'fallenAngel', 'chronos', 'origin'],
   // 出現する敵（from〜to 階で、add の敵が出現候補に加わる。to を省略すると無限モードの手前まで）
   // rare は { 敵ID: 1体ごとの出現率 }
   // 無限モードでは、ここに書いた全ての敵からランダムに出る
@@ -665,6 +1053,23 @@ const DUNGEON = {
     { from: 41, to: 50, add: ['cloudSpirit', 'stormBird', 'thunderSprite', 'gargoyle'] },
     { from: 43, to: 50, add: ['angelSoldier', 'clockwork', 'skyWitch'] },
     { from: 46, to: 50, add: ['griffon', 'wyvern'] },
+    // 冥府の墓地
+    { from: 51, to: 60, add: ['zombie', 'ghost', 'graveCrow', 'lanternGhost'] },
+    { from: 53, to: 60, add: ['mummy', 'cursedDoll', 'reaper'] },
+    { from: 56, to: 60, add: ['vampire', 'tombGolem'] },
+    // 魔界の城
+    { from: 61, to: 70, add: ['imp', 'evilEye', 'darkSlime', 'grimoire'] },
+    { from: 61,         rare: { devilMerchant: 0.06 } },
+    { from: 63, to: 70, add: ['hellhound', 'demonKnight'] },
+    { from: 66, to: 70, add: ['minotaur', 'mirrorDemon'] },
+    // 凍てつく氷河
+    { from: 71, to: 80, add: ['snowmanSoldier', 'frostWolf', 'penguinKnight', 'snowSpirit'] },
+    { from: 73, to: 80, add: ['crystalGolem', 'iceDrake', 'auroraWisp'] },
+    { from: 76, to: 80, add: ['mammoth', 'yeti'] },
+    // 星の神殿
+    { from: 81, to: 90, add: ['starShard', 'moonRabbit', 'astrologer', 'meteorGolem'] },
+    { from: 83, to: 90, add: ['mechaAngel', 'constellationBeast', 'timeWarden'] },
+    { from: 86, to: 90, add: ['voidOrb', 'rift'] },
   ],
   statPerFloor: 0.10,                  // 1階ごとの敵ステータス上昇率（1階が基準）
   scaledStats: ['hp', 'atk', 'def'],   // 階層で上がるステータス（速度も上げるなら 'spd' を足す）
@@ -686,16 +1091,24 @@ const AREAS = [
   { from: 21, name: '灼熱の火山',     image: 'backgrounds/bg_volcano.jpg', bg: 'linear-gradient(180deg, #6e1a10 0%, #b8441a 60%, #e07a2a 100%)', text: '#ffe2c4' },
   { from: 31, name: '深海の神殿',     image: 'backgrounds/bg_sea.jpg',     bg: 'linear-gradient(180deg, #0a2350 0%, #12477e 55%, #1f73a8 100%)', text: '#cfe8ff' },
   { from: 41, name: '天空の城',       image: 'backgrounds/bg_sky.jpg',     bg: 'linear-gradient(180deg, #f6fbff 0%, #d4ecfb 50%, #9fd4f2 100%)', text: '#24476a' },
-  { from: 51, name: '無限回廊',       bg: 'linear-gradient(180deg, #22113a 0%, #3c1a52 60%, #5a2470 100%)', text: '#e4ccff',
-    images: ['backgrounds/bg_forest.jpg', 'backgrounds/bg_dungeon.jpg', 'backgrounds/bg_volcano.jpg', 'backgrounds/bg_sea.jpg', 'backgrounds/bg_sky.jpg'] },
+  { from: 51, name: '冥府の墓地',     image: 'backgrounds/bg_graveyard.jpg', bg: 'linear-gradient(180deg, #1c1630 0%, #2c2442 60%, #3a3446 100%)', text: '#ddd6f5' },
+  { from: 61, name: '魔界の城',       image: 'backgrounds/bg_demon.jpg',     bg: 'linear-gradient(180deg, #2a0c14 0%, #3e1020 60%, #24101a 100%)', text: '#ffd6d6' },
+  { from: 71, name: '凍てつく氷河',   image: 'backgrounds/bg_glacier.jpg', bg: 'linear-gradient(180deg, #cfe6f5 0%, #9cc7e4 60%, #6f9fc4 100%)', text: '#16324a' },
+  { from: 81, name: '星の神殿',       image: 'backgrounds/bg_cosmos.jpg',  bg: 'linear-gradient(180deg, #0b0a24 0%, #1d1650 60%, #2c1f6a 100%)', text: '#e0dcff' },
+  { from: 91, name: '神々の塔',       image: 'backgrounds/bg_tower.jpg',   bg: 'linear-gradient(180deg, #fbe7c0 0%, #f4d79a 60%, #e8c477 100%)', text: '#4a3410' },
+  { from: 101, name: '無限回廊',      bg: 'linear-gradient(180deg, #22113a 0%, #3c1a52 60%, #5a2470 100%)', text: '#e4ccff',
+    images: ['backgrounds/bg_forest.jpg', 'backgrounds/bg_dungeon.jpg', 'backgrounds/bg_volcano.jpg', 'backgrounds/bg_sea.jpg', 'backgrounds/bg_sky.jpg',
+      'backgrounds/bg_graveyard.jpg', 'backgrounds/bg_demon.jpg', 'backgrounds/bg_glacier.jpg', 'backgrounds/bg_cosmos.jpg', 'backgrounds/bg_tower.jpg'] },
 ];
 
 // ---------------------------------------------------------------------
-// 周回（最終ボスを倒したあとの2周目以降）
+// 無限モード（100階の終焉の神を倒したあと、101階から）
+// 敵は1〜90階の全エリアの敵からランダム。10階ごとにボス階（DUNGEON.endlessBosses を順番に）
 // ---------------------------------------------------------------------
-const NEW_GAME_PLUS = {
-  statRatePerCycle: 1,   // 1周ごとに敵ステータスに足す倍率（2周目 ×2、3周目 ×3 …）
-  expRatePerCycle: 1,    // 1周ごとに経験値に足す倍率
+const ENDLESS = {
+  rewardEvery: 10,   // 何階ごとに報酬か（ボス階と同じ）
+  points: 30,        // 報酬のポイント
+  bossChoices: 2,    // 報酬の上級アイテム選択：この数の上級アイテムから1つ選ぶ
 };
 
 // ---------------------------------------------------------------------

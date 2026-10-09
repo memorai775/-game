@@ -7,7 +7,7 @@
 // アイテム全体の設定
 // ---------------------------------------------------------------------
 const ITEM_CONFIG = {
-  slotsPerChar: 3,       // 1人が装備できる数
+  slotsPerChar: 4,       // 1人が装備できる数
   rewardEvery: 5,        // 何階ごとのクリアで報酬がもらえるか
   rewardChoices: 5,      // 報酬で並ぶアイテムの数（この中から1個選ぶ）
   highTierFrom: 20,      // この階以降のクリア報酬には上級アイテムが混ざることがある
@@ -15,7 +15,7 @@ const ITEM_CONFIG = {
   baseCritMultiplier: 2, // 会心のダメージ倍率（critDamage で上乗せ）
   // 経験値に変換したときの1個あたりの経験値（次の全体レベルまでに必要な経験値に対する割合）
   // 例：下級 0.25 → 必要経験値の25%。上級は下級2つから作るので、それより多め
-  expRate: { 1: 0.25, 2: 0.8 },
+  expRate: { 1: 0.25, 2: 0.8, 3: 3 },
 };
 
 // ---------------------------------------------------------------------
@@ -65,6 +65,15 @@ const ITEM_CONFIG = {
 //     critHeal       会心を出すと最大HPの ratio 回復
 //     critLifesteal  会心時に与ダメージの value を吸収
 //     reflectCrit    反射ダメージにも会心判定がある
+//   --- 特級装備で追加 ---
+//     splash          攻撃するたび、ほかの敵全員にも与えたダメージの ratio
+//     teamGuard       味方全員の被ダメージ -value（複数装備しても一番強いものだけ）
+//     lastStand       1戦闘に1回、倒れるダメージを受けてもHP ratio で耐える
+//     extraTurn       行動のあと chance の確率でもう一度行動
+//     cooldownCut     スキルの使用制限ターン -value
+//     teamCharm       味方それぞれの行動開始時に最大HPの value 回復（複数装備しても一番強いものだけ）
+//     overhealBarrier 最大HPを超えた回復分を、最大HPの cap までバリアにする（ダメージを先に受け止める）
+//     reflectDelay    反射するたび相手の行動ゲージ -amount（同じ相手には、その相手の1行動につき1回まで）
 
 // 効果の部品を短く書くための関数
 const addStat    = (stat, value)   => ({ type: 'stat', stat, value });
@@ -222,3 +231,113 @@ const RECIPES = [
   { items: ['thornArmor', 'swiftBoots'],       result: 'thorn_boots' },
   { items: ['swiftBoots', 'swiftBoots'],       result: 'boots_boots' },
 ];
+
+// ---------------------------------------------------------------------
+// 特級装備（上級装備3つから作る。★1〜★5のランクつき）
+// 数値の調整はここだけでOK
+// ---------------------------------------------------------------------
+// 作り方：上級3つに含まれる下級素材（上級1つ＝下級2つ、合計6つ）を数え、一番多い素材の系統の特級装備になる
+//         その素材の数でランクが決まる（rankByCount）。効果は★5の値 × rankRates[★]
+// effects の書き方は上の ITEMS と同じ。scale: false の部品・値は、ランクに関係なく固定
+// byRank: { 1: 値, ... } を書いた値は、ランクごとに決まった値を使う（神眼のピアスの会心ダメージなど）
+const LEGEND = {
+  // 素材の数 → ランク（1〜2個＝★1、3個＝★2、4個＝★3、5個＝★4、6個＝★5）
+  rankByCount: { 1: 1, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 },
+  // ランク → 効果の倍率（★5＝100%）
+  rankRates: { 1: 0.55, 2: 0.65, 3: 0.75, 4: 0.9, 5: 1.0 },
+  // 系統（下級素材のID）→ 特級装備
+  families: {
+    ironSword:     { key: 'sword',   kind: '剣',     name: '天剣',         image: 'items/legend_sword.png',
+                     effects: [addStat('atk', 40), addSpecial('splash', { ratio: 0.3 })],
+                     desc: v => `攻撃+${v.atk}、攻撃するたびに敵全員にも与えたダメージの${v.ratio}%` },
+    leatherShield: { key: 'shield',  kind: '盾',     name: '神盾',         image: 'items/legend_shield.png',
+                     effects: [addStat('def', 40), addSpecial('teamGuard', { value: 0.15, pct: true })],
+                     desc: v => `防御+${v.def}、味方全員の被ダメージ-${v.teamGuard}%（複数装備しても重ならない）` },
+    lifeRing:      { key: 'ring',    kind: '指輪',   name: '生命の神輪',   image: 'items/legend_ring.png',
+                     effects: [addStat('hp', 200), addSpecial('lastStand', { ratio: 0.5, scale: false })],
+                     desc: v => `HP+${v.hp}、1戦闘に1回、倒れるダメージを受けてもHP50%で耐える` },
+    galeFeather:   { key: 'feather', kind: '羽',     name: '天翼',         image: 'items/legend_feather.png',
+                     effects: [addStat('spd', 30), addSpecial('extraTurn', { chance: 0.3 })],
+                     desc: v => `速度+${v.spd}、行動後${v.chance}%でもう一度行動` },
+    manaOrb:       { key: 'orb',     kind: '珠',     name: '叡智の宝珠',   image: 'items/legend_orb.png',
+                     effects: [addBonus('skillPower', 0.8), addSpecial('cooldownCut', { value: 1, scale: false })],
+                     desc: v => `スキル効果+${v.skillPower}%、スキルの使用制限ターン-1` },
+    prayerCharm:   { key: 'charm',   kind: 'お守り', name: '世界樹の護符', image: 'items/legend_charm.png',
+                     effects: [addSpecial('teamCharm', { value: 0.05, pct: true })],
+                     desc: v => `毎ターン味方全員のHPを${v.teamCharm}%回復（複数装備しても重ならない）` },
+    critPierce:    { key: 'earring', kind: 'ピアス', name: '神眼のピアス', image: 'items/legend_earring.png',
+                     effects: [addBonus('critRate', 0.5), { type: 'bonus', key: 'critDamage', byRank: { 1: 0.5, 2: 0.5, 3: 0.5, 4: 0.5, 5: 1.0 } }],
+                     desc: v => `会心率+${v.critRate}%、会心ダメージ${2 + v.critDamage / 100}倍` },
+    sharpFang:     { key: 'fang',    kind: '牙',     name: '魔王の牙',     image: 'items/legend_fang.png',
+                     effects: [addBonus('lifesteal', 0.4), addSpecial('overhealBarrier', { cap: 0.3 })],
+                     desc: v => `吸収${v.lifesteal}%、最大HPを超えた回復分は最大HPの${v.cap}%までバリアになる` },
+    thornArmor:    { key: 'thorn',   kind: 'いばら', name: '茨の神鎧',     image: 'items/legend_thorn.png',
+                     effects: [addBonus('reflect', 0.45), addSpecial('reflectDelay', { amount: 0.25 })],
+                     desc: v => `反射${v.reflect}%、反射するたび相手の行動ゲージ-${v.amount}%（同じ敵には1ターンに1回まで）` },
+    swiftBoots:    { key: 'boots',   kind: 'ブーツ', name: '時渡りの靴',   image: 'items/legend_boots.png',
+                     effects: [addStat('spd', 50), addBonus('evasion', 0.2)],
+                     desc: v => `速度+${v.spd}、回避率+${v.evasion}%` },
+  },
+};
+
+// 値をランクの倍率で縮める（小数第1位で四捨五入。割合は「%の数字」で小数第1位）
+function legendScale(value, rate, isRatio) {
+  if (isRatio) return Math.round(value * rate * 1000) / 1000;   // 例：0.3 × 0.55 = 0.165（16.5%）
+  return Math.round(value * rate * 10) / 10;                     // 例：30 × 0.55 = 16.5
+}
+
+// 特級装備の ID（例：legend_sword_3）
+function legendId(familyBase, rank) {
+  return `legend_${LEGEND.families[familyBase].key}_${rank}`;
+}
+
+// 特級装備（10系統 × ★1〜★5）を ITEMS に登録する
+(function registerLegendItems() {
+  for (const base in LEGEND.families) {
+    const f = LEGEND.families[base];
+    for (let rank = 1; rank <= 5; rank++) {
+      const rate = LEGEND.rankRates[rank];
+      const shown = {}; // 説明文に出す数字（割合は%で）
+      const effects = f.effects.map(e => {
+        const out = { ...e };
+        delete out.scale;
+        delete out.byRank;
+        delete out.pct;
+        if (e.byRank) {
+          out.value = e.byRank[rank];
+          shown[e.key] = Math.round(out.value * 1000) / 10;
+          return out;
+        }
+        const scale = e.scale !== false;
+        for (const k of Object.keys(e)) {
+          if (['type', 'stat', 'key', 'scale', 'pct'].includes(k) || typeof e[k] !== 'number') continue;
+          const isRatio = e.type === 'bonus' || e.pct || k === 'ratio' || k === 'chance' || k === 'cap' || k === 'amount';
+          out[k] = scale ? legendScale(e[k], rate, isRatio) : e[k];
+          const label = k === 'value' ? (e.stat || e.key) : k;
+          shown[label] = isRatio ? Math.round(out[k] * 1000) / 10 : out[k];
+        }
+        return out;
+      });
+      ITEMS[legendId(base, rank)] = {
+        name: `${f.name}★${rank}`, baseName: f.name, tier: 3, rank, family: base, kind: f.kind,
+        image: f.image, desc: f.desc(shown), effects,
+      };
+    }
+  }
+})();
+
+// 上級装備の素材（下級2つ）。レシピから逆引き
+function itemMaterials(itemId) {
+  const r = RECIPES.find(x => x.result === itemId);
+  return r ? r.items : [];
+}
+
+// 上級装備3つから、できあがる特級装備を調べる
+// 戻り値：{ counts: {下級ID: 数}, top: 一番多い数, candidates: [同数で並んだ下級ID], rank }
+function legendPreview(highIds) {
+  const counts = {};
+  for (const id of highIds) for (const m of itemMaterials(id)) counts[m] = (counts[m] || 0) + 1;
+  const top = Math.max(0, ...Object.values(counts));
+  const candidates = Object.keys(counts).filter(k => counts[k] === top && LEGEND.families[k]);
+  return { counts, top, candidates, rank: LEGEND.rankByCount[Math.min(6, top)] || 1 };
+}

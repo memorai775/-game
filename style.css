@@ -1665,3 +1665,113 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 #upgrade-root *, #item-root * { animation: none !important; transition: none !important; }
 /* スクロール位置を中身の変化に引っぱられないように */
 #panel-body { overflow-anchor: none; }
+
+/* ---- 第一部クリアの演出（50階） ---- */
+.area-banner.part1-banner .area-name { color: #ffd54a; font-size: 2.4rem; text-shadow: 0 2px 0 #7a5a10, 0 0 18px rgba(255, 213, 74, 0.7); }
+.area-banner.part1-banner { animation-duration: 4s; }
+
+/* ---- 敵が7体以上いるとき（虚神の目など）：カードを小さくして1列に収める ---- */
+#stage #enemy-area.crowd7 { gap: 3px; }
+#stage #enemy-area.crowd7 > .unit { padding: 2px 3px; }
+#stage #enemy-area.crowd7 .portrait,
+#stage #enemy-area.crowd7 .portrait-fallback { width: 52px !important; height: 52px !important; }
+#stage #enemy-area.crowd7 .sprite-box { min-height: 52px !important; }
+#stage #enemy-area.crowd7 .name { font-size: 10px; }
+/* 星座の獣の星 */
+.sbadge.stars { background: rgba(60, 50, 120, 0.85); }
+
+/* ---- 神々の塔：部位（足・首・コア・球・目）と、タップで狙える表示 ---- */
+#stage .unit.part { border: 2px dashed rgba(255, 213, 74, 0.55); }
+#stage .unit.part .hpbar { height: 5px; }
+#stage .unit.targetable { border-color: #ffd54a; box-shadow: 0 0 0 2px rgba(255, 213, 74, 0.5); cursor: crosshair; }
+
+/* ---- 真のエンディング：スタッフロール ---- */
+.ending-credits { height: 150px; overflow: hidden; position: relative; margin: 10px auto; max-width: 420px;
+  -webkit-mask-image: linear-gradient(transparent, #000 20%, #000 80%, transparent);
+          mask-image: linear-gradient(transparent, #000 20%, #000 80%, transparent); }
+.credits-roll { position: absolute; left: 0; right: 0; text-align: center; line-height: 1.9; color: #e8e8f0;
+  animation: credits-roll 40s linear forwards; }
+.credits-roll .cr-title { font-size: 1.4rem; font-weight: bold; color: #ffd54a; margin: 10px 0; }
+.credits-roll .cr-head { margin-top: 18px; color: #9ac8ff; font-weight: bold; }
+@keyframes credits-roll { from { transform: translateY(150px); } to { transform: translateY(-100%); } }
+.ending-stats b { color: #ffd54a; }
+
+/* ---- エンディングを16:9の画面に収める（長いときはスクロール） ---- */
+#stage #ending { overflow-y: auto; padding: 10px 16px; }
+#stage .ending-box { max-width: 640px; margin: auto; }
+#stage .ending-title { font-size: 1.5rem; margin-bottom: 6px; }
+#stage .ending-text { font-size: 13px; line-height: 1.6; }
+#stage .ending-credits { height: 110px; margin: 6px auto; font-size: 13px; }
+#stage .ending-stats { margin: 6px 0; font-size: 13px; line-height: 1.5; }
+#stage .ending-buttons { flex-direction: row; justify-content: center; flex-wrap: wrap; }
+#stage .ending-buttons button { min-width: 220px; padding: 8px 12px; font-size: 14px; }
+#stage .ending-note { margin-top: 6px; }
+@keyframes credits-roll { from { transform: translateY(110px); } to { transform: translateY(-100%); } }
+
+/* ---- 敵が9体以上（クラーケンの足など）：さらに小さく ---- */
+#stage #enemy-area.crowd9 { gap: 2px; }
+#stage #enemy-area.crowd9 > .unit { padding: 2px 1px; }
+#stage #enemy-area.crowd9 .portrait,
+#stage #enemy-area.crowd9 .portrait-fallback { width: 40px !important; height: 40px !important; }
+#stage #enemy-area.crowd9 .sprite-box { min-height: 40px !important; }
+#stage #enemy-area.crowd9 .name { font-size: 9px; }
+#stage #enemy-area.crowd9 .turn-badge { font-size: 9px; }
+
+/* 敵が多いとき：カードの中身で幅が広がらないように */
+#stage #enemy-area.crowd7 > .unit { overflow: hidden; }
+#stage #enemy-area.crowd7 > .unit > * { min-width: 0; max-width: 100%; }
+#stage #enemy-area.crowd7 .name,
+#stage #enemy-area.crowd7 .turn-badge { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* エンディングの背景は暗く（文字を読みやすく） */
+#stage #ending { background: radial-gradient(circle at 50% 30%, rgba(80, 64, 30, 0.95), rgba(5, 8, 20, 0.97) 70%); }
+
+/* 並びの欄そのものが、カードの最小幅で画面より広がらないように */
+#stage .unit-row { min-width: 0; }
+#stage .field { min-width: 0; }
+
+/* =====================================================================
+   特級装備（虹色の枠・★ランク）と特級合成
+   ===================================================================== */
+.item-icon.tier3 {
+  border: 2px solid transparent;
+  background: linear-gradient(#fdfbff, #fdfbff) padding-box,
+              linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #6ee7a8, #5bc0ff, #a77bff, #ff6ad5) border-box;
+  box-shadow: 0 0 8px rgba(167, 123, 255, 0.75);
+}
+.item-name.tier3 {
+  font-weight: bold;
+  background: linear-gradient(90deg, #ff7a7a, #ffd36e, #8ff0a4, #7ac8ff, #c79bff, #ff8ad8);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.craft-tabs { display: flex; gap: 6px; margin: 6px 0 8px; }
+.craft-tabs button { flex: 1; padding: 6px; font-size: 0.85rem; }
+.craft-tabs button.active { border-color: #c79bff; color: #e6d4ff; background: rgba(167, 123, 255, 0.18); }
+.legend-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0; }
+.legend-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; }
+.legend-mats { display: flex; gap: 2px; font-size: 0.7rem; color: #9aa3c0; }
+.legend-preview { margin: 8px 0; padding: 8px; border-radius: 8px; border: 1px solid #a77bff; background: rgba(167, 123, 255, 0.1); }
+.legend-breakdown { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.8rem; }
+.legend-count { display: inline-flex; align-items: center; gap: 2px; opacity: 0.7; }
+.legend-count.top { opacity: 1; font-weight: bold; color: #ffd54a; }
+.legend-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.8rem; }
+.legend-choice button.active { border-color: #ffd54a; color: #ffd54a; }
+.legend-result { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.legend-result small { display: block; }
+.legend-go { width: 100%; margin-top: 8px; padding: 8px; font-weight: bold; border-color: #c79bff; color: #e6d4ff; }
+.legend-pick-grid .inv-cell:disabled { opacity: 0.35; }
+.legend-ranks li.best { color: #ffd54a; }
+.zk-cell.legend { border-color: rgba(167, 123, 255, 0.6); }
+.legend-made { display: flex; justify-content: center; margin-bottom: 6px; }
+.legend-made .item-icon.lg { width: 84px; height: 84px; animation: legend-pulse 1.2s ease-in-out infinite; }
+@keyframes legend-pulse { 50% { box-shadow: 0 0 22px rgba(255, 255, 255, 0.9), 0 0 36px rgba(167, 123, 255, 0.8); } }
+/* 特級装備ができたときの虹色の光 */
+.legend-flash {
+  position: absolute; inset: 0; z-index: 58; pointer-events: none;
+  background: conic-gradient(from 0deg, rgba(255,95,109,.55), rgba(255,195,113,.55), rgba(249,248,113,.55), rgba(110,231,168,.55), rgba(91,192,255,.55), rgba(167,123,255,.55), rgba(255,106,213,.55), rgba(255,95,109,.55));
+  mix-blend-mode: screen; animation: legend-flash 1.8s ease-out forwards;
+}
+@keyframes legend-flash { 0% { opacity: 0; filter: hue-rotate(0deg); } 15% { opacity: 1; } 100% { opacity: 0; filter: hue-rotate(360deg); } }
+
+/* 図鑑の上の記録（総撃破数・無限モード・旧記録） */
+.zk-records { margin: 4px 0 6px; font-size: 0.8rem; color: #c0c6dc; text-align: center; }
+

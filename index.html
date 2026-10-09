@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>ゆーるぴーじー｜ブラウザで遊べる放置ターン制RPG</title>
-  <meta name="description" content="ゆーるぴーじーは、ブラウザで遊べる放置ターン制RPG。仲間を集め、強化とアイテム合成で50階層のダンジョンに挑もう。オートバトル・放置成長・ランキングにも対応。">
+  <meta name="description" content="ゆーるぴーじーは、ブラウザで遊べる放置ターン制RPG。仲間を集め、強化とアイテム合成で100階層のダンジョンに挑もう。オートバトル・放置成長・ランキングにも対応。">
   <meta name="theme-color" content="#151823">
 
   <!-- Google Search Console のサイト所有権の確認用（消さないでください） -->
@@ -24,16 +24,16 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="ゆーるぴーじー">
   <meta property="og:title" content="ゆーるぴーじー｜ブラウザで遊べる放置ターン制RPG">
-  <meta property="og:description" content="ゆーるぴーじー：仲間を集め、強化とアイテム合成で50階層のダンジョンに挑む放置ターン制RPG。到達階層ランキングで競おう。">
+  <meta property="og:description" content="ゆーるぴーじー：仲間を集め、強化とアイテム合成で100階層のダンジョンに挑む放置ターン制RPG。到達階層ランキングで競おう。">
   <meta property="og:image" content="characters/hero.png">
   <!-- 公開URLが決まったら追加： <meta property="og:url" content="https://（公開先のURL）/"> -->
   <meta property="og:locale" content="ja_JP">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="ゆーるぴーじー｜ブラウザで遊べる放置ターン制RPG">
-  <meta name="twitter:description" content="ゆーるぴーじー：仲間を集め、強化とアイテム合成で50階層のダンジョンに挑む放置ターン制RPG。">
+  <meta name="twitter:description" content="ゆーるぴーじー：仲間を集め、強化とアイテム合成で100階層のダンジョンに挑む放置ターン制RPG。">
   <meta name="twitter:image" content="characters/hero.png">
 
-  <link rel="stylesheet" href="style.css?v=202610091510">
+  <link rel="stylesheet" href="style.css?v=202610100500">
 </head>
 <body>
   <!-- ゲーム画面（960×540 の16:9。screen.js が画面サイズに合わせて拡大縮小する） -->
@@ -126,17 +126,18 @@
       <div class="ending-box">
         <div class="ending-title">― THE END ―</div>
         <p class="ending-text">
-          天空王ゼニスは光の中に消えた。<br>
-          火山の炎は静まり、深海は穏やかさを取り戻し、<br>
-          空にはふたたび澄んだ青が広がっている。<br><br>
+          魔王ディアボロスは終焉の炎とともに崩れ落ちた。<br>
+          魔界の城は静寂に包まれ、冥府の墓地には朝の光が差し込む。<br>
+          森も、火山も、深海も、空も――世界はふたたび穏やかさを取り戻した。<br><br>
           長い旅をともにした仲間たちに、心からの感謝を。
         </p>
+        <div id="ending-credits" class="ending-credits"></div>
         <div id="ending-stats" class="ending-stats"></div>
         <div class="ending-buttons">
-          <button id="ending-next"></button>
-          <button id="ending-endless">このまま51階へ（無限モード）</button>
+
+          <button id="ending-endless">このまま101階へ（無限モード）</button>
         </div>
-        <p class="ending-note">どちらを選んでも、レベル・ポイント・強化・仲間・アイテムは引き継がれます。</p>
+        <p class="ending-note">レベル・ポイント・強化・仲間・アイテムはそのまま、101階からの無限モードに挑めます。</p>
       </div>
     </div>
 
@@ -177,17 +178,17 @@
 
   <!-- ?v= の数字は版番号。ファイルを更新したら数字を変えると、ブラウザが古いファイルを使わずに読み込み直す -->
   <!-- 読み込み順：画面 → データ → 成長要素・ダンジョン → パネル → クラウド → 詳細・🎒・設定 → バトル・起動 -->
-  <script src="screen.js?v=202610091510"></script>
-  <script src="data.js?v=202610091510"></script>
-  <script src="items.js?v=202610091510"></script>
-  <script src="progress.js?v=202610091510"></script>
-  <script src="dungeon.js?v=202610091510"></script>
-  <script src="panel.js?v=202610091510"></script>
-  <script src="firebase-config.js?v=202610091510"></script>
-  <script src="cloud.js?v=202610091510"></script>
-  <script src="overlay.js?v=202610091510"></script>
-  <script src="zukan.js?v=202610091510"></script>
-  <script src="effects.js?v=202610091510"></script>
-  <script src="main.js?v=202610091510"></script>
+  <script src="screen.js?v=202610100500"></script>
+  <script src="data.js?v=202610100500"></script>
+  <script src="items.js?v=202610100500"></script>
+  <script src="progress.js?v=202610100500"></script>
+  <script src="dungeon.js?v=202610100500"></script>
+  <script src="panel.js?v=202610100500"></script>
+  <script src="firebase-config.js?v=202610100500"></script>
+  <script src="cloud.js?v=202610100500"></script>
+  <script src="overlay.js?v=202610100500"></script>
+  <script src="zukan.js?v=202610100500"></script>
+  <script src="effects.js?v=202610100500"></script>
+  <script src="main.js?v=202610100500"></script>
 </body>
 </html>

@@ -269,7 +269,27 @@ function openSettings() {
       <input type="checkbox" id="set-lite" ${isLiteMode() ? 'checked' : ''}>
       <span><b>軽量モード</b><br>
       <small>光る・点滅するなどの重い見た目の効果を減らします。スマホで絵が止まる・カクつくときは ON にしてください（スマホでは最初から ON）</small></span>
-    </label>`);
+    </label>
+    ${hasSaveBackup() ? `
+    <div class="setting-row setting-danger">
+      <span><b>アップデート前のデータに戻す</b><br>
+      <small>アップデートの前（移行する前）のセーブデータに戻します。今のデータ（アップデート後の進み具合）は消えます。戻したデータは、51階より先にいてもそのまま遊べます。</small></span>
+      <button id="set-restore" type="button" class="danger">戻す</button>
+    </div>` : ''}`);
+  const restore = document.getElementById('set-restore');
+  if (restore) {
+    restore.addEventListener('click', () => {
+      if (!confirm('アップデート前のデータに戻します。今のデータ（アップデート後の進み具合）は消えます。よろしいですか？')) return;
+      try {
+        restoreSaveBackup();
+        Cloud.save('restore');
+        // 画面を読み込み直して、戻したデータで始め直す
+        setTimeout(() => location.reload(), 300);
+      } catch (e) {
+        alert(`戻せませんでした（${e.message}）`);
+      }
+    });
+  }
   document.getElementById('set-lite').addEventListener('change', e => {
     gameState.settings.lite = e.target.checked;
     saveGame();

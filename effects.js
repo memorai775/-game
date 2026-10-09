@@ -44,7 +44,7 @@ const Fx = {
       burn: 'fx_fire', freeze: 'fx_ice', poison: 'fx_poison', sleep: 'fx_music', charm: 'fx_music',
       ink: 'fx_dark', vulnerable: 'fx_dark', focus: 'fx_buff', counterStance: 'fx_shield',
       barrier: 'fx_shield', burrowed: 'fx_shield', submerged: 'fx_shield', shelled: 'fx_shield', stone: 'fx_shield',
-      flying: 'fx_buff', puffed: 'fx_shield',
+      flying: 'fx_buff', puffed: 'fx_shield', bound: 'fx_dark', doom: 'fx_dark', sealed: 'fx_dark', iceWall: 'fx_ice', entombed: 'fx_ice', foresight: 'fx_buff', voidVeil: 'fx_dark', inverted: 'fx_dark', armored: 'fx_shield', shut: 'fx_shield', rule_noHeal: 'fx_time', rule_noSkill: 'fx_time', rule_reverse: 'fx_time',
     }[statusId] || 'fx_poison';
   },
 

@@ -5,6 +5,17 @@
 'use strict';
 
 const SAVE_KEY = 'turnBattleSave';
+const SAVE_VERSION = 2;                   // セーブデータの版（形が変わるたびに上げて、移行処理を足す）
+const BACKUP_KEY = 'save_backup_v1';      // 移行の前の元データ（設定画面から戻せる）
+// 51階以降が新しくなり、2周目がなくなったとき（版1 → 2）の移行の設定
+const MIGRATION_V2 = {
+  restartFloor: 51,         // 対象の人は、今いる階・チェックポイントをここにする
+  baseFloor: 50,            // 補償の計算：以前の到達度 ＝ 1周目の最高到達階 − 50（2周目の人は ＋ 2周目の最高到達階 ＋ 50）
+  pointsPer10: 20,          // 到達度10ごとのポイント
+  itemsPer10: 1,            // 到達度10ごとの上級アイテム選択の回数
+  title: '先駆者',          // 称号
+  veteranTitle: '歴戦の先駆者', // 2周目以降だった人の称号
+};
 
 // ---------------------------------------------------------------------
 // ゲーム全体の状態（ブラウザに自動保存される）
@@ -30,24 +41,27 @@ function newGameState() {
     equips: {},         // 装備 { キャラID: [アイテムID, ...]（最大 ITEM_CONFIG.slotsPerChar 個） }
     pendingRewards: [], // まだ選んでいない報酬 [[アイテムID × 5], ...]
     discovered: [],     // 一度でも手に入れたアイテム（合成図鑑・📖図鑑で表示する）
+    legendBest: {},     // 特級装備：系統ごとに入手した最高ランク { sword: 3, ... }（📖図鑑）
+    saveVersion: SAVE_VERSION, // セーブデータの版（古ければ読み込み時に移行する）
+    titles: [],         // 称号（名前の横に表示。例：先駆者）
+    oldMaxFloor: 0,     // アップデート前の最高到達階（記録として表示）
+    oldRecord: null,    // アップデート前の旧記録 { maxFloor, cycle, cycleFloor }（図鑑・記録画面に表示）
+    endlessUnlocked: false, // 無限モードが解放されたか（100階クリアで解放）
+    endlessBest: 0,     // 無限モードの最高到達階
+    noticeVersion: 0,   // アップデートのお知らせをどの版まで見たか
     bestiary: {},       // 倒した敵の記録 { 敵ID: { kills: 倒した数, firstFloor: 初めて倒した階 } }（📖図鑑）
-    cycle: 1,           // 何周目か（最終ボスを倒すと次の周へ進める）
-    endingShown: false, // この周でエンディングを見たか
+    endingShown: false, // 真のエンディングを見たか
+    partsShown: [],     // 「第○部クリア」を見た階（DUNGEON.partClears のキー）
+    endingFloor: DUNGEON.finalFloor, // エンディングの階（最終ボスの階が変わったときの引き継ぎ用）
+    towerWipes: {},     // 神々の塔で全滅した回数 { 階: 回数 }（ボスのHPが下がる救済措置）
+    playSeconds: 0,     // 遊んだ時間（秒。画面を開いている間だけ数える）
+    totalWipes: 0,      // 全滅した回数の合計（エンディングの記録）
     tutorialSeen: false, // 遊び方の説明を見たか（初回だけ自動で表示）
-    bestFloor: 1,       // これまでの最高到達階（周回しても減らない。ランキングに使う）
+    bestFloor: 1,       // これまでの最高到達階（減らない。ランキングに使う）
     nickname: '',       // ランキングに出す名前
   };
 }
 
-// 次の周へ（レベル・ポイント・強化・仲間・アイテムはそのまま、1階から。敵が強くなる）
-function startNewCycle() {
-  gameState.cycle++;
-  gameState.floor = 1;
-  gameState.maxFloor = 1;
-  gameState.checkpoint = 1;
-  gameState.endingShown = false;
-  saveGame();
-}
 
 // 仲間を加える。出撃枠に空きがあれば出撃メンバーにも入れる（空きが無ければ控え）
 // 戻り値：出撃メンバーに入ったら true
@@ -125,9 +139,100 @@ function loadGame() {
   applySaveData(saved);
 }
 
+// ---------------------------------------------------------------------
+// セーブデータの移行（古い版のデータを今の形にする）
+// ---------------------------------------------------------------------
+// 版1 → 2：51〜100階が新しくなったので、51階より上にいた人は51階から再スタート（育成・アイテムはそのまま）
+// 補償：以前の最高到達階が51階以上なら、10階ごとにポイントと上級アイテム選択、称号「先駆者」
+function migrateV1toV2(s) {
+  const m = MIGRATION_V2;
+  const cycle = s.cycle || 1;
+  const floor = s.floor || 1;
+  const curMax = s.maxFloor || 1;
+  // 対象：2周目以降の人、または51階以上にいる（いた）人。それ以外は新しい項目を足すだけ
+  const target = cycle >= 2 || floor >= m.restartFloor || curMax >= m.restartFloor;
+  // 1周目の最高到達階：2周目以降なら、周回しても減らない記録（bestFloor）が1周目の到達階
+  const firstMax = cycle >= 2 ? Math.max(s.bestFloor || 1, curMax) : curMax;
+  const info = { target, cycle, firstMax, cycleFloor: cycle >= 2 ? curMax : 0, progress: 0, points: 0, items: 0, title: null };
+  delete s.cycle; // 周回はなくなった
+  if (target) {
+    // 以前の到達度
+    info.progress = Math.max(0, firstMax - m.baseFloor) + (cycle >= 2 ? curMax + m.baseFloor : 0);
+    const tens = Math.floor(info.progress / 10);
+    info.points = tens * m.pointsPer10;
+    info.items = tens * m.itemsPer10;
+    // 旧記録（図鑑・記録画面に残す）
+    s.oldRecord = { maxFloor: firstMax, cycle, cycleFloor: info.cycleFloor };
+    s.oldMaxFloor = firstMax;
+    // 51階から再スタート（新しい51〜100階をもう一度楽しめるよう、最高到達階も51階に）
+    s.floor = m.restartFloor;
+    s.checkpoint = m.restartFloor;
+    s.maxFloor = m.restartFloor;
+    s.bestFloor = Math.max(s.bestFloor || 1, firstMax); // ランキングの記録は減らさない
+    s.endingShown = false;                               // 100階の真のエンディングは未閲覧
+    s.points = (s.points || 0) + info.points;
+    const high = Object.keys(ITEMS).filter(id => ITEMS[id].tier === 2);
+    s.pendingRewards = Array.isArray(s.pendingRewards) ? s.pendingRewards : [];
+    for (let i = 0; i < info.items; i++) {
+      s.pendingRewards.push(high.slice().sort(() => Math.random() - 0.5).slice(0, ITEM_CONFIG.rewardChoices));
+    }
+    info.title = cycle >= 2 ? m.veteranTitle : m.title;
+    s.titles = Array.isArray(s.titles) ? s.titles : [];
+    if (!s.titles.includes(info.title)) s.titles.push(info.title);
+  }
+  s.migrationNotice = info; // 次の起動時に1回だけお知らせを出す
+  s.saveVersion = 2;
+  return s;
+}
+// 古い版なら移行する（移行の前に元のデータをバックアップ）。失敗したら元のデータのまま返す
+function migrateSave(saved) {
+  if (!saved || typeof saved !== 'object') return saved;
+  const version = saved.saveVersion || 1;
+  if (version >= SAVE_VERSION) return saved;
+  try {
+    if (!localStorage.getItem(BACKUP_KEY)) localStorage.setItem(BACKUP_KEY, JSON.stringify(saved));
+  } catch (e) { /* バックアップを保存できなくても続行 */ }
+  let s = JSON.parse(JSON.stringify(saved));
+  if (version < 2) s = migrateV1toV2(s);
+  return s;
+}
+
+// バックアップがあるか（設定画面の「アップデート前のデータに戻す」ボタン用）
+function hasSaveBackup() {
+  try { return !!localStorage.getItem(BACKUP_KEY); } catch (e) { return false; }
+}
+
+// バックアップ（アップデート前のデータ）に戻す。戻したデータは移行しない（51階より上でもそのまま遊ぶ）
+function restoreSaveBackup() {
+  const raw = localStorage.getItem(BACKUP_KEY);
+  if (!raw) return false;
+  const data = JSON.parse(raw);
+  data.saveVersion = SAVE_VERSION;
+  data.restoredFromBackup = true;
+  applySaveData(data);
+  saveGame(); // 保存時刻を今にする（クラウドの古いデータで上書きされないように）
+  return true;
+}
+
 // セーブデータ（ブラウザ・クラウドのどちらから読んだものでも）を gameState にする
-// 足りない項目は初期値で補い、data.js / items.js から消えたキャラやアイテムは取り除く
+// 古い版なら移行する。移行や読み込みでエラーが起きたら、元のデータのまま読み込み直す
 function applySaveData(saved) {
+  let migrated;
+  try {
+    migrated = migrateSave(saved);
+    applySaveDataRaw(migrated);
+    if (migrated !== saved) saveGame(); // 移行したら新しい版で保存
+  } catch (e) {
+    console.error('セーブデータの移行に失敗しました。元のデータで続けます', e);
+    if (typeof showToast === 'function') showToast('⚠ データの移行に失敗したため、アップデート前のデータで続けます');
+    applySaveDataRaw(saved);
+    // 版は元のまま（次に開いたとき、もう一度移行を試す）
+    if (saved && typeof saved === 'object') gameState.saveVersion = saved.saveVersion || 1;
+  }
+}
+
+// 足りない項目は初期値で補い、data.js / items.js から消えたキャラやアイテムは取り除く
+function applySaveDataRaw(saved) {
   gameState = newGameState();
   if (saved && typeof saved === 'object') {
     gameState = Object.assign(newGameState(), saved);
@@ -150,8 +255,45 @@ function applySaveData(saved) {
   // 図鑑：今持っている・装備しているアイテムは「入手済み」にする（古いセーブデータ向け）
   gameState.inventory.forEach(markDiscovered);
   for (const id in gameState.equips) gameState.equips[id].forEach(markDiscovered);
-  // ランキング用の最高到達階（周回してもリセットしない）
+  // ランキング用の最高到達階（減らない）
   gameState.bestFloor = Math.max(gameState.bestFloor || 1, gameState.maxFloor || 1);
+
+  // 最終ボスの階が変わった（50階 → 70階 → 100階）古いセーブデータ：
+  // 以前のエンディングを見ていたら、その階の「第○部クリア」を見た扱いにし、新しいエンディングはまだ見ていない扱いにする
+  if (saved && saved.endingFloor !== DUNGEON.finalFloor) {
+    const oldFinal = saved.endingFloor || 50; // endingFloor が無いのは50階がエンディングだったころのデータ
+    const shown = new Set(Array.isArray(saved.partsShown) ? saved.partsShown : []);
+    for (const f of Object.keys(DUNGEON.partClears).map(Number)) {
+      const sawOldEnding = !!saved.endingShown && f === oldFinal;
+      const sawPart1 = f === 50 && !!saved.part1Shown;
+      if (sawOldEnding || sawPart1 || gameState.maxFloor > f) shown.add(f);
+    }
+    gameState.partsShown = [...shown];
+    gameState.endingShown = gameState.maxFloor > DUNGEON.finalFloor;
+    gameState.endingFloor = DUNGEON.finalFloor;
+  }
+  if (!Array.isArray(gameState.partsShown)) gameState.partsShown = [];
+  if (!gameState.legendBest || typeof gameState.legendBest !== 'object') gameState.legendBest = {};
+  // 装備枠：多すぎる分は所持品に戻す（枠を減らしたときのため）
+  for (const id in gameState.equips) {
+    const extra = gameState.equips[id].splice(ITEM_CONFIG.slotsPerChar);
+    gameState.inventory.push(...extra);
+  }
+  if (!gameState.towerWipes || typeof gameState.towerWipes !== 'object') gameState.towerWipes = {};
+  delete gameState.part1Shown;
+  delete gameState.cycle; // 周回はなくなった
+}
+
+// 旧記録（アップデート前の記録）の文章。無ければ ''
+function oldRecordText() {
+  const r = gameState.oldRecord;
+  if (!r) return gameState.oldMaxFloor ? `アップデート前の最高到達階 ${gameState.oldMaxFloor}階` : '';
+  return `アップデート前：最高 ${r.maxFloor}階${r.cycle >= 2 ? `（${r.cycle}周目 ${r.cycleFloor}階まで）` : ''}`;
+}
+
+// 総撃破数（図鑑の記録の合計）
+function totalKills() {
+  return Object.values(gameState.bestiary || {}).reduce((s, r) => s + (r.kills || 0), 0);
 }
 
 // 📖図鑑：敵を倒したことを記録する。初めて倒したなら true を返す
@@ -356,10 +498,10 @@ function grantBonusReward(floor) {
   saveGame();
 }
 
-// ボス撃破の報酬：上級アイテムだけの中から1個選べる
-function grantBossReward() {
+// ボス撃破の報酬：上級アイテムだけの中から1個選べる（count：並べる数。無限モードは2つ）
+function grantBossReward(count = ITEM_CONFIG.rewardChoices) {
   const high = Object.keys(ITEMS).filter(id => ITEMS[id].tier === 2);
-  const choices = high.slice().sort(() => Math.random() - 0.5).slice(0, ITEM_CONFIG.rewardChoices);
+  const choices = high.slice().sort(() => Math.random() - 0.5).slice(0, count);
   gameState.pendingRewards.push(choices);
   saveGame();
 }
@@ -426,6 +568,34 @@ function craft(recipe) {
   markDiscovered(recipe.result);
   saveGame();
   return recipe.result;
+}
+
+// ---------------------------------------------------------------------
+// アイテム：特級合成（上級3つ → 特級1つ。系統とランクは items.js の LEGEND で決まる）
+// ---------------------------------------------------------------------
+// 所持品だけで、この上級3つを用意できるか
+function hasItems(ids) {
+  const counts = inventoryCounts();
+  const need = {};
+  for (const id of ids) need[id] = (need[id] || 0) + 1;
+  return Object.keys(need).every(id => (counts[id] || 0) >= need[id]);
+}
+
+// 特級合成する。family：同数で並んだときに選んだ系統（下級素材のID）。できた特級装備のIDを返す
+function craftLegend(highIds, family) {
+  if (highIds.length !== 3 || !highIds.every(id => ITEMS[id] && ITEMS[id].tier === 2) || !hasItems(highIds)) return null;
+  const pv = legendPreview(highIds);
+  const base = pv.candidates.includes(family) ? family : pv.candidates[0];
+  if (!base) return null;
+  for (const id of highIds) gameState.inventory.splice(gameState.inventory.indexOf(id), 1);
+  const made = legendId(base, pv.rank);
+  gameState.inventory.push(made);
+  markDiscovered(made);
+  // 図鑑：系統ごとに入手した最高ランクを記録
+  const key = LEGEND.families[base].key;
+  gameState.legendBest[key] = Math.max(gameState.legendBest[key] || 0, pv.rank);
+  saveGame();
+  return made;
 }
 
 // ---------------------------------------------------------------------

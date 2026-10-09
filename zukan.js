@@ -18,6 +18,7 @@ const Zukan = {
   // ---- 手がかり ----
   // その敵が最初に出てくる階（ボスはボス階。分裂・召喚でしか出ない敵はその説明）
   enemyHint(id) {
+    if (ENEMIES[id].hint) return ENEMIES[id].hint; // ほかの敵から出てくる敵など
     const bossFloor = Object.keys(DUNGEON.bosses).find(f => DUNGEON.bosses[f].includes(id));
     if (bossFloor) return `${bossFloor}階のボス`;
     const pool = DUNGEON.enemyPools.find(p => (p.add || []).includes(id) || (p.rare && p.rare[id]));
@@ -25,7 +26,7 @@ const Zukan = {
     // ほかの敵の能力から出てくるもの
     for (const key in ENEMIES) {
       const e = ENEMIES[key];
-      const split = (e.traits || []).find(t => t.type === 'splitOnDeath' && t.into === id);
+      const split = (e.traits || []).find(t => (t.type === 'splitOnDeath' || t.type === 'splitAt') && t.into === id);
       if (split) return `${e.name}が分裂して出現`;
     }
     return '？？？';
@@ -44,8 +45,18 @@ const Zukan = {
     return keys.sort((a, b) => (firstFloor(a) - firstFloor(b)) || (keys.indexOf(a) - keys.indexOf(b)));
   },
 
+  // 特級装備は系統ごとに1枠（入手した最高ランクを表示）
+  legendKnown(id) {
+    const it = ITEMS[id];
+    return !!(gameState.legendBest || {})[LEGEND.families[it.family].key];
+  },
+  isKnown(id) {
+    return ITEMS[id].tier === 3 ? this.legendKnown(id) : gameState.discovered.includes(id);
+  },
+
   itemHint(id) {
     if (ITEMS[id].tier === 1) return '階層クリアの報酬で手に入る';
+    if (ITEMS[id].tier === 3) return `特級合成：上級装備3つの素材に「${ITEMS[ITEMS[id].family].name}」が一番多く含まれていると作れる`;
     const r = RECIPES.find(x => x.result === id);
     return r ? `合成：${ITEMS[r.items[0]].name}＋${ITEMS[r.items[1]].name}` : '？？？';
   },
@@ -53,9 +64,11 @@ const Zukan = {
   // ---- 一覧 ----
   renderList() {
     const enemyIds = this.enemyOrder();
-    const itemIds = Object.keys(ITEMS).sort((a, b) => ITEMS[a].tier - ITEMS[b].tier); // 下級 → 上級
+    // 下級 → 上級 → 特級（特級は系統ごとに1枠。入手した最高ランク、未入手なら★5の姿をシルエットで）
+    const legendIds = Object.keys(LEGEND.families).map(base => legendId(base, (gameState.legendBest || {})[LEGEND.families[base].key] || 5));
+    const itemIds = Object.keys(ITEMS).filter(id => ITEMS[id].tier < 3).sort((a, b) => ITEMS[a].tier - ITEMS[b].tier).concat(legendIds);
     const knownEnemies = enemyIds.filter(id => gameState.bestiary[id]).length;
-    const knownItems = itemIds.filter(id => gameState.discovered.includes(id)).length;
+    const knownItems = itemIds.filter(id => this.isKnown(id)).length;
 
     let grid;
     if (this.tab === 'monster') {
@@ -71,8 +84,8 @@ const Zukan = {
       }).join('');
     } else {
       grid = itemIds.map(id => {
-        const known = gameState.discovered.includes(id);
-        return `<button class="zk-cell item${known ? '' : ' unknown'}" data-kind="item" data-id="${id}">
+        const known = this.isKnown(id);
+        return `<button class="zk-cell item${known ? '' : ' unknown'}${ITEMS[id].tier === 3 ? ' legend' : ''}" data-kind="item" data-id="${id}">
           ${itemIcon(id, 'md', !known)}
           <span class="zk-name">${known ? ITEMS[id].name : '？？？'}</span>
         </button>`;
@@ -85,6 +98,7 @@ const Zukan = {
         <button data-tab="item" class="${this.tab === 'item' ? 'active' : ''}">アイテム ${knownItems}/${itemIds.length}</button>
       </div>
       <div class="zk-progress"><div style="width:${(this.tab === 'monster' ? knownEnemies / enemyIds.length : knownItems / itemIds.length) * 100}%"></div></div>
+      <p class="zk-records">総撃破数 ${totalKills()}体${gameState.endlessBest ? `　♾無限モード 最高${gameState.endlessBest}階` : ''}${oldRecordText() ? `<br><small>旧記録：${oldRecordText()}</small>` : ''}</p>
       <div class="zk-grid">${grid}</div>
       <p class="modal-note">タップすると詳しく見られます。まだ見つけていないものは、手がかりだけ表示されます。</p>`);
 
@@ -144,6 +158,7 @@ const Zukan = {
   // ---- アイテムの詳細 ----
   showItem(id) {
     const item = ITEMS[id];
+    if (item.tier === 3) { this.showLegend(id); return; }
     const known = gameState.discovered.includes(id);
     const owned = inventoryCounts()[id] || 0;
     const equipped = Object.keys(gameState.equips).filter(c => gameState.equips[c].includes(id)).map(c => CHARACTERS[c].name);
@@ -173,6 +188,35 @@ const Zukan = {
         <p class="zk-hint">手がかり：${this.itemHint(id)}</p>
         ${recipeHtml}
         <p class="modal-note">手に入れると図鑑に登録されます。</p>
+      </div>`;
+    this.showDetail(html);
+  },
+
+  // ---- 特級装備の詳細（系統ごと。ランクごとの効果も一覧で見せる） ----
+  showLegend(id) {
+    const item = ITEMS[id];
+    const base = item.family;
+    const fam = LEGEND.families[base];
+    const best = (gameState.legendBest || {})[fam.key] || 0;
+    const counts = inventoryCounts();
+    let owned = 0;
+    for (let r = 1; r <= 5; r++) owned += counts[legendId(base, r)] || 0;
+    const ranks = [1, 2, 3, 4, 5].map(r => `<li class="${r === best ? 'best' : ''}"><b>★${r}</b>（${Math.round(LEGEND.rankRates[r] * 100)}%）：${ITEMS[legendId(base, r)].desc}</li>`).join('');
+    const html = best ? `
+      <div class="zk-detail">
+        <div class="zk-big">${itemIcon(id, 'lg')}</div>
+        <div class="zk-dname">${itemLabel(id)}</div>
+        <div class="zk-sub">特級装備（${fam.kind}の系統）　入手した最高ランク ★${best}</div>
+        <p class="zk-desc">${item.desc}</p>
+        <table class="zk-stats"><tr><th>所持</th><td>${owned}個</td></tr></table>
+        <div class="detail-sec">ランクごとの効果</div><ul class="detail-list legend-ranks">${ranks}</ul>
+        <p class="modal-note">${this.itemHint(id)}</p>
+      </div>` : `
+      <div class="zk-detail unknown">
+        <div class="zk-big">${itemIcon(id, 'lg', true)}</div>
+        <div class="zk-dname">？？？</div>
+        <p class="zk-hint">手がかり：${this.itemHint(id)}</p>
+        <p class="modal-note">作ると図鑑に登録されます。</p>
       </div>`;
     this.showDetail(html);
   },
