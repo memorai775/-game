@@ -303,7 +303,27 @@ function applySaveDataRaw(saved) {
   }
   if (!gameState.towerWipes || typeof gameState.towerWipes !== 'object') gameState.towerWipes = {};
   delete gameState.part1Shown;
+  rescueAfterOrigin(saved);
   delete gameState.cycle; // 周回はなくなった
+}
+
+// 救済：100階の終焉の神を倒している（図鑑に記録がある）のに101階より手前にいる人を、無限モード（101階）に戻す
+// （以前の版のエンディングで「2周目へ」を選んで1階に戻った人。2周目はなくなったので、100階クリア後の無限モードから再開）
+function rescueAfterOrigin(saved) {
+  const beat = gameState.bestiary && gameState.bestiary[DUNGEON.bosses[DUNGEON.finalFloor][0]];
+  if (!beat || gameState.floor >= DUNGEON.endlessFrom) return;
+  const start = DUNGEON.endlessFrom;
+  gameState.rescueNotice = { fromFloor: gameState.floor, cycle: (saved && saved.cycle) || gameState.cycle || 1 };
+  gameState.floor = start;
+  gameState.checkpoint = start;
+  gameState.maxFloor = Math.max(gameState.maxFloor || 1, start);
+  gameState.bestFloor = Math.max(gameState.bestFloor || 1, start);
+  gameState.endlessUnlocked = true;
+  gameState.endlessBest = Math.max(gameState.endlessBest || 0, start);
+  gameState.endingShown = true;
+  gameState.legendUnlocked = true;
+  for (const f of Object.keys(DUNGEON.partClears).map(Number)) if (!gameState.partsShown.includes(f)) gameState.partsShown.push(f);
+  gameState.towerWipes = {};
 }
 
 // ランキングで名前の横に出す称号（いちばん新しくもらったもの。無ければ ''）

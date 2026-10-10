@@ -3402,6 +3402,17 @@ const HOWTO_HTML = `
 // 移行処理をした人（51階より先にいた人）には、再スタートとお詫びのお知らせを出す
 // ---------------------------------------------------------------------
 function showUpdateNotice() {
+  // 救済（100階クリア後に「2周目」で1階に戻っていた人を、無限モードに戻した）のお知らせ
+  if (gameState.rescueNotice) {
+    const rn = gameState.rescueNotice;
+    UI.popup(`
+      <p class="popup-title">📢 データを直しました</p>
+      <p>以前の版で、100階クリア後に「2周目」として${rn.fromFloor}階からやり直しになっていました。<br>
+      2周目はなくなったため、<b>無限モード（${DUNGEON.endlessFrom}階）</b>から再開します。</p>
+      <p class="popup-note">レベル・ポイント・強化・仲間・アイテム・図鑑はそのままです。<br>ご迷惑をおかけしました。</p>`);
+    delete gameState.rescueNotice;
+    saveGame();
+  }
   if ((gameState.noticeVersion || 0) >= SAVE_VERSION) return;
   const mg = gameState.migrationNotice;
   if (mg && mg.target) {
