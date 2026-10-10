@@ -16,6 +16,11 @@ const MIGRATION_V2 = {
   title: '先駆者',          // 称号
   veteranTitle: '歴戦の先駆者', // 2周目以降だった人の称号
 };
+// 過去に2周目へ進んだ人（2周目の廃止で進み具合が消えた人）への補償（1回だけ）
+const CYCLE_COMPENSATION = {
+  itemsEach: 6,   // 下級装備をすべて、それぞれこの数ずつ
+  level: 650,     // 全体レベルをここまで上げる（上がった分のポイントももらえる）
+};
 
 // ---------------------------------------------------------------------
 // ゲーム全体の状態（ブラウザに自動保存される）
@@ -47,6 +52,7 @@ function newGameState() {
     titles: [],         // 称号（名前の横に表示。例：先駆者）
     oldMaxFloor: 0,     // アップデート前の最高到達階（記録として表示）
     oldRecord: null,    // アップデート前の旧記録 { maxFloor, cycle, cycleFloor }（図鑑・記録画面に表示）
+    cycleCompensated: false, // 2周目へ進んでいた人への補償を受け取ったか
     endlessUnlocked: false, // 無限モードが解放されたか（100階クリアで解放）
     endlessBest: 0,     // 無限モードの最高到達階
     noticeVersion: 0,   // アップデートのお知らせをどの版まで見たか
@@ -303,15 +309,42 @@ function applySaveDataRaw(saved) {
   }
   if (!gameState.towerWipes || typeof gameState.towerWipes !== 'object') gameState.towerWipes = {};
   delete gameState.part1Shown;
-  rescueAfterOrigin(saved);
+  const rescued = rescueAfterOrigin(saved);
+  compensateCycleVictims(saved, rescued);
   delete gameState.cycle; // 周回はなくなった
+}
+
+// 過去に2周目へ進んだ人への補償：下級装備すべてを6個ずつ＋全体レベル650（1回だけ）
+// 対象：データに2周目以降の記録がある人（まだ周回の情報が残っている／旧記録に周回が残っている／2周目から101階に戻した人）
+function compensateCycleVictims(saved, rescued) {
+  if (gameState.cycleCompensated) return;
+  const wasCycle = (saved && (saved.cycle || 1) >= 2)
+    || (gameState.oldRecord && gameState.oldRecord.cycle >= 2)
+    || rescued;
+  if (!wasCycle) return;
+  const c = CYCLE_COMPENSATION;
+  const lows = Object.keys(ITEMS).filter(id => ITEMS[id].tier === 1);
+  for (const id of lows) {
+    for (let i = 0; i < c.itemsEach; i++) gameState.inventory.push(id);
+    markDiscovered(id);
+  }
+  const fromLevel = gameState.globalLevel;
+  let points = 0;
+  if (fromLevel < c.level) {
+    points = (c.level - fromLevel) * PROGRESSION.pointsPerLevel; // 上がったレベルの分のポイント
+    gameState.globalLevel = c.level;
+    gameState.points += points;
+    gameState.exp = 0;
+  }
+  gameState.cycleCompensated = true;
+  gameState.cycleCompNotice = { items: lows.length * c.itemsEach, kinds: lows.length, each: c.itemsEach, fromLevel, toLevel: gameState.globalLevel, points };
 }
 
 // 救済：100階の終焉の神を倒している（図鑑に記録がある）のに101階より手前にいる人を、無限モード（101階）に戻す
 // （以前の版のエンディングで「2周目へ」を選んで1階に戻った人。2周目はなくなったので、100階クリア後の無限モードから再開）
 function rescueAfterOrigin(saved) {
   const beat = gameState.bestiary && gameState.bestiary[DUNGEON.bosses[DUNGEON.finalFloor][0]];
-  if (!beat || gameState.floor >= DUNGEON.endlessFrom) return;
+  if (!beat || gameState.floor >= DUNGEON.endlessFrom) return false;
   const start = DUNGEON.endlessFrom;
   gameState.rescueNotice = { fromFloor: gameState.floor, cycle: (saved && saved.cycle) || gameState.cycle || 1 };
   gameState.floor = start;
@@ -324,6 +357,7 @@ function rescueAfterOrigin(saved) {
   gameState.legendUnlocked = true;
   for (const f of Object.keys(DUNGEON.partClears).map(Number)) if (!gameState.partsShown.includes(f)) gameState.partsShown.push(f);
   gameState.towerWipes = {};
+  return true;
 }
 
 // ランキングで名前の横に出す称号（いちばん新しくもらったもの。無ければ ''）

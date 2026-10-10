@@ -3413,6 +3413,20 @@ function showUpdateNotice() {
     delete gameState.rescueNotice;
     saveGame();
   }
+  // 2周目へ進んでいた人への補償のお知らせ
+  if (gameState.cycleCompNotice) {
+    const cc = gameState.cycleCompNotice;
+    UI.popup(`
+      <p class="popup-title">🎁 お詫びの品をお届けしました</p>
+      <p>2周目がなくなったことで、2周目での進み具合が消えてしまいました。<br>ご迷惑をおかけしたお詫びとして、次のものをお贈りしました。</p>
+      <ul class="howto-list">
+        <li>下級装備すべて（${cc.kinds}種類）を<b>${cc.each}個ずつ</b>（合計${cc.items}個）</li>
+        ${cc.toLevel > cc.fromLevel ? `<li>全体レベル <b>${cc.fromLevel} → ${cc.toLevel}</b>（ポイント +${cc.points}）</li>` : `<li>全体レベルはすでに${cc.fromLevel}なので、そのままです</li>`}
+      </ul>
+      <p class="popup-note">装備は「アイテム」タブの所持品に入っています。合成して上級・特級装備を作ってみてください。</p>`);
+    delete gameState.cycleCompNotice;
+    saveGame();
+  }
   if ((gameState.noticeVersion || 0) >= SAVE_VERSION) return;
   const mg = gameState.migrationNotice;
   if (mg && mg.target) {
