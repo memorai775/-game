@@ -113,27 +113,35 @@ function itemIcon(id, size = 'md', unknown = false) {
 }
 
 // スキルの使用制限の説明（cooldown 3 ＝ 使ったあと3ターン休み ＝「4ターンに1回」）
-function skillLimitText(skill) {
+// cut：装備（叡智の宝珠など）で短くなる使用制限ターン
+function skillLimitText(skill, cut = 0) {
   const parts = [];
+  const cd = Math.max(0, (skill.cooldown || 0) - cut);
   if (skill.oncePerBattle) parts.push('1戦闘1回');
-  else if (skill.cooldown) parts.push(`${skill.cooldown + 1}ターンに1回`);
+  else if (cd) parts.push(`${cd + 1}ターンに1回`);
   if (skill.needsKi) parts.push('気が必要');
   return parts.length ? parts.join('・') : 'いつでも使える';
 }
 
 // スキルの効果の説明（使用制限は別に表示するので、説明文の中の「（4ターンに1回）」などは省く）
-function skillDescText(skill) {
+// power：1＋装備の「スキル効果+○%」（歌など dynDesc のあるスキルは、装備込みの実際の数値で説明する）
+function skillDescText(skill, power = 1) {
+  if (skill.dynDesc) return skill.dynDesc(power);
   return (skill.desc || '')
     .replace(/[（(](\d+ターンに1回|1戦闘1回|使用後\d+ターン使用不可)[）)]/g, '')
     .replace(/。1戦闘1回$/, '');
 }
 
 // キャラのスキル一覧（名前・効果・使用制限）。強化タブと仲間加入のお知らせで使う
+// （装備のスキル効果・使用制限ターン短縮も反映した数値で出す）
 function skillListHtml(charId) {
+  const fx = gameState.party.includes(charId) ? itemEffects(charId) : null;
+  const power = 1 + ((fx && fx.bonus.skillPower) || 0);
+  const cut = fx ? fx.specials.filter(s => s.key === 'cooldownCut').reduce((m, s) => Math.max(m, s.value || 0), 0) : 0;
   return `<ul class="skill-list">${CHARACTERS[charId].skills.map(id => {
     const s = SKILLS[id];
-    return `<li><span class="skill-name">${s.name}</span><span class="skill-limit">${skillLimitText(s)}</span>` +
-      `<small>${skillDescText(s)}</small></li>`;
+    return `<li><span class="skill-name">${s.name}</span><span class="skill-limit">${skillLimitText(s, cut)}</span>` +
+      `<small>${skillDescText(s, power)}</small></li>`;
   }).join('')}</ul>`;
 }
 

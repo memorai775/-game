@@ -82,6 +82,10 @@ const ENEMY_TYPE_LABELS = {
 //   { type: 'openCore' }                               自分のコアを開く（次の自分の行動まで攻撃が通る）
 //   { type: 'summonBoss', list: [...], hpRate: 0.25 }  過去のボスを1体呼び出す（HPは hpRate 倍）
 //   { type: 'annihilate' }                             相手全員を倒す（終焉のカウントダウン）
+//   { type: 'fullRestore' }                            HP全回復＋悪い状態異常を解除。戦闘不能なら全回復で復活（巻き戻し）
+//   buff・status に scaleByPower: true を付けると、使う人の装備の「スキル効果+○%」が上がる量に乗る（歌）
+// スキルの target に 'anyAlly' を書くと、戦闘不能の味方も選べる（巻き戻し）
+// スキルに dynDesc: p => '説明' を書くと、装備込みの実際の数値で説明を出す（p ＝ 1＋スキル効果）
 // スキルに element: 'fire' / 'light' を付けると属性つきの技（ゾンビの起き上がりを防ぐ）
 // スキルに magic: true を付けると魔法の技（霊体に軽減されない）
 // 効果ごとに target: 'self' を書くと、その効果だけ自分にかかる（例：攻撃＋自分強化）
@@ -92,7 +96,8 @@ const SKILLS = {
   defend:     { name: '防御', effect: 'fx_shield', target: 'self', desc: '次の行動まで受けるダメージ半減', effects: [{ type: 'guard' }] },
 
   // --- 主人公用 ---
-  heavySlash: { name: '強斬り', effect: 'fx_slash', target: 'enemy', cooldown: 3, desc: '敵1体に1.8倍ダメージ（使用後3ターン使用不可）', effects: [{ type: 'damage', power: 1.8 }] },
+  heavySlash: { name: '強斬り', effect: 'fx_slash', target: 'enemy', cooldown: 3, desc: '敵1体に2.0倍ダメージ', effects: [{ type: 'damage', power: 2.0 }] },
+  heroStrike: { name: '勇者の一閃', effect: 'fx_slash', target: 'enemy', cooldown: 3, desc: '敵1体に3.0倍ダメージ。HP50%以下の敵には必ず会心', effects: [{ type: 'damage', power: 3.0, sureCritBelow: 0.5 }] },
   legSweep:   { name: '足払い', effect: 'fx_impact', target: 'enemy', cooldown: 3, desc: '敵1体に0.6倍ダメージ＋行動を大きく遅らせる', effects: [{ type: 'damage', power: 0.6 }, { type: 'delay', amount: 0.6 }] },
   firstAid:   { name: '応急手当', effect: 'fx_heal', target: 'self', cooldown: 4, desc: '自分の最大HPの35%回復', effects: [{ type: 'heal', ratio: 0.35 }] },
   quicken:    { name: '加速', effect: 'fx_buff', target: 'self', cooldown: 5, desc: '3ターンの間 速度1.5倍', effects: [{ type: 'buff', stat: 'spd', rate: 1.5, turns: 3 }] },
@@ -123,24 +128,33 @@ const SKILLS = {
 
   // --- 15階以降に加入する仲間 ---
   // oncePerBattle: 1戦闘1回（ボタンに「使用済み」と出る） / needsKi: 気がないと使えない
-  twinSlash:    { name: '二刀斬り', effect: 'fx_slash',     target: 'enemy', desc: '敵1体に0.7倍×2回', effects: [{ type: 'damage', power: 0.7, hits: 2 }] },
-  shadowStitch: { name: '影縫い', effect: 'fx_dark',       target: 'enemy', cooldown: 2, desc: '敵1体の行動ゲージ-40%', effects: [{ type: 'delay', amount: 0.4 }] },
+  twinSlash:    { name: '二刀斬り', effect: 'fx_slash',     target: 'enemy', desc: '敵1体に0.9倍×2回', effects: [{ type: 'damage', power: 0.9, hits: 2 }] },
+  shadowStitch: { name: '影縫い', effect: 'fx_dark',       target: 'enemy', cooldown: 2, desc: '敵1体の行動ゲージ-50%', effects: [{ type: 'delay', amount: 0.5 }] },
   steal:        { name: '盗む', effect: 'fx_slash',         target: 'enemy', oncePerBattle: true, desc: '攻撃＋30%で盗む（成功するとこの階のクリア時にアイテムを1回多く選べる）。1戦闘1回', effects: [{ type: 'damage', power: 1.0 }, { type: 'steal', chance: 0.3 }] },
   fireball:     { name: '火球', effect: 'fx_fire',         target: 'enemy', magic: true, desc: '敵1体に1.4倍ダメージ', effects: [{ type: 'damage', power: 1.4 }] },
   inferno:      { name: '爆炎', effect: 'fx_explosion',         target: 'allEnemies', cooldown: 2, magic: true, shake: true, desc: '敵全体に0.8倍ダメージ＋やけど（2ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
   focus:        { name: '魔力集中', effect: 'fx_buff',     target: 'self', cooldown: 3, desc: '次のスキルの効果2倍＋行動ゲージ+30%', effects: [{ type: 'status', status: 'focus', turns: 99 }, { type: 'gaugeAfter', amount: 0.3 }] },
-  aimedShot:    { name: '狙い撃ち', effect: 'fx_arrow',     target: 'weakestEnemy', desc: 'HPが一番低い敵に1.2倍ダメージ。HP30%以下の敵には必ず会心', effects: [{ type: 'damage', power: 1.2, sureCritBelow: 0.3 }] },
+  aimedShot:    { name: '狙い撃ち', effect: 'fx_arrow',     target: 'weakestEnemy', desc: 'HPが一番低い敵に、防御を無視して1.2倍ダメージ。HP50%以下の敵には必ず会心', effects: [{ type: 'damage', power: 1.2, sureCritBelow: 0.5, ignoreDef: true }] },
   pinningArrow: { name: '足止めの矢', effect: 'fx_arrow',   target: 'enemy', cooldown: 2, desc: '敵1体に0.9倍ダメージ＋速度-20%（3ターン）', effects: [{ type: 'damage', power: 0.9 }, { type: 'buff', stat: 'spd', rate: 0.8, turns: 3 }] },
-  volley:       { name: '連射', effect: 'fx_arrow',         target: 'self', desc: 'ランダムな敵に0.5倍×4回', effects: [{ type: 'damageRandom', power: 0.5, count: 4 }] },
-  windSong:     { name: '疾風の歌', effect: 'fx_music',     target: 'allAllies', cooldown: 2, desc: '味方全員の速度+20%（3ターン）', effects: [{ type: 'buff', stat: 'spd', rate: 1.2, turns: 3, tag: 'song_wind' }] },
-  braveSong:    { name: '勇気の歌', effect: 'fx_music',     target: 'allAllies', cooldown: 2, desc: '味方全員の攻撃+20%（3ターン）', effects: [{ type: 'buff', stat: 'atk', rate: 1.2, turns: 3, tag: 'song_brave' }] },
+  volley:       { name: '連射', effect: 'fx_arrow',         target: 'self', desc: 'ランダムな敵に0.6倍×5回', effects: [{ type: 'damageRandom', power: 0.6, count: 5 }] },
+  // 歌：scaleByPower の効果には、使う人の装備の「スキル効果+○%」が乗る（30% × 1.5 ＝ +45% のように）
+  // dynDesc(p)：p ＝ 1＋スキル効果。装備込みの実際の数値で説明を作る
+  windSong:     { name: '疾風の歌', effect: 'fx_music',     target: 'allAllies', cooldown: 2, desc: '味方全員の速度+30%（4ターン）',
+                  dynDesc: p => `味方全員の速度+${songPct(0.3, p)}%（4ターン）`,
+                  effects: [{ type: 'buff', stat: 'spd', rate: 1.3, turns: 4, tag: 'song_wind', scaleByPower: true }] },
+  braveSong:    { name: '勇気の歌', effect: 'fx_music',     target: 'allAllies', cooldown: 2, desc: '味方全員の攻撃+30%（4ターン）',
+                  dynDesc: p => `味方全員の攻撃+${songPct(0.3, p)}%（4ターン）`,
+                  effects: [{ type: 'buff', stat: 'atk', rate: 1.3, turns: 4, tag: 'song_brave', scaleByPower: true }] },
+  healSong:     { name: '癒しの歌', effect: 'fx_music',     target: 'allAllies', cooldown: 3, desc: '味方全員のHPを15%回復＋4ターンの間、毎ターン5%回復（再生）',
+                  dynDesc: p => `味方全員のHPを${songPct(0.15, p)}%回復＋4ターンの間、毎ターン${songPct(0.05, p)}%回復（再生）`,
+                  effects: [{ type: 'heal', ratio: 0.15 }, { type: 'status', status: 'songRegen', value: 0.05, turns: 4, scaleByPower: true }] },
   lullaby:      { name: '子守唄', effect: 'fx_music',       target: 'enemy', cooldown: 3, desc: '敵1体を眠らせる（行動ゲージ0＋1回休み。ボスには半分の効果）', effects: [{ type: 'sleep' }] },
-  comboStrike:  { name: '連撃', effect: 'fx_impact',         target: 'enemy', desc: '敵1体に0.6倍×3回', effects: [{ type: 'damage', power: 0.6, hits: 3 }] },
-  hyakuretsu:   { name: '奥義・百烈拳', effect: 'fx_impact', target: 'enemy', needsKi: true, danger: true, desc: '気を全部使い、気の数×0.8倍のダメージ', effects: [{ type: 'kiBurst', per: 0.8 }] },
-  stance:       { name: '構え', effect: 'fx_shield',         target: 'self', cooldown: 2, desc: '次に受ける攻撃に反撃する', effects: [{ type: 'status', status: 'counterStance', turns: 1 }] },
+  comboStrike:  { name: '連撃', effect: 'fx_impact',         target: 'enemy', desc: '敵1体に0.7倍×3回（気が3たまる）', effects: [{ type: 'damage', power: 0.7, hits: 3 }] },
+  hyakuretsu:   { name: '奥義・百烈拳', effect: 'fx_impact', target: 'enemy', needsKi: true, danger: true, desc: '気を全部使い、気の数×1.2倍のダメージ', effects: [{ type: 'kiBurst', per: 1.2 }] },
+  stance:       { name: '構え', effect: 'fx_shield',         target: 'self', cooldown: 2, desc: '次に受ける攻撃に、1.5倍の反撃をする', effects: [{ type: 'status', status: 'counterStance', turns: 1 }] },
   timeHaste:    { name: '加速', effect: 'fx_time',         target: 'ally', cooldown: 1, desc: '味方1人の行動ゲージを満タンにする（すぐ行動）', effects: [{ type: 'fillGauge' }] },
   timeStop:     { name: '時間停止', effect: 'fx_time',     target: 'allEnemies', cooldown: 3, desc: '敵全員の行動ゲージ-50%（4ターンに1回）', effects: [{ type: 'delay', amount: 0.5 }] },
-  rewind:       { name: '巻き戻し', effect: 'fx_time',     target: 'ally', oncePerBattle: true, desc: '味方1人のHPを3ターン前の値に戻す（1戦闘1回）', effects: [{ type: 'rewind', turns: 3 }] },
+  rewind:       { name: '巻き戻し', effect: 'fx_time',     target: 'anyAlly', oncePerBattle: true, desc: '味方1人の時間を巻き戻し、HP全回復＋状態異常を解除。戦闘不能の味方も全回復で復活させる（1戦闘1回）', effects: [{ type: 'fullRestore' }] },
 
   // --- 灼熱の火山（21〜30階） ---
   flameBreath:   { name: '炎の息', effect: 'fx_fire',     target: 'enemy', cooldown: 2, desc: '1.2倍ダメージ＋やけど', effects: [{ type: 'damage', power: 1.2 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
@@ -251,6 +265,8 @@ SKILLS.inferno.element = 'fire';
 // icon: 名前の横に出るアイコン / name: 表示名 / desc: マウスを乗せたときの説明（t は書いた値）
 // ---------------------------------------------------------------------
 const pct = v => `${Math.round(v * 100)}%`;
+// 歌の数値（%）：基本の割合 × (1＋スキル効果)。小数第1位まで
+const songPct = (base, p = 1) => Math.round(base * p * 1000) / 10;
 const TRAIT_INFO = {
   reflect:        { icon: '🪞', name: '反射',     desc: t => `受けたダメージの${pct(t.value)}を攻撃者に反射` },
   poisonOnHit:    { icon: '☠',  name: '毒',       desc: t => `攻撃した相手を毒にする（毎ターン最大HPの${pct(t.value)}、${t.turns}ターン）` },
@@ -321,6 +337,10 @@ const TRAIT_INFO = {
   chronoControl:  { icon: '⏳', name: '時の支配', desc: () => '毎ターン「相手1人の行動を飛ばす」か「自分が2回行動」のどちらかを使う' },
   chronoRewind:   { icon: '⏪', name: '巻き戻し', desc: t => `HP${pct(t.below)}以下になると1回だけ、戦闘開始時のHPに戻る` },
   oneShot:        { icon: '⚡', name: '一撃',     desc: () => '1回行動すると消える' },
+  // --- 仲間のパッシブ（味方の traits にも書ける） ---
+  courage:        { icon: '🔥', name: '勇気',     desc: t => `味方が倒れるたびに攻撃+${pct(t.rate - 1)}（戦闘中のみ、最大${t.max}回）` },
+  nimble:         { icon: '🍃', name: '身軽',     desc: t => `回避率${pct(t.evasion)}、戦闘開始時に行動ゲージ+${pct(t.gauge)}` },
+  hawkEye:        { icon: '🦅', name: '鷹の目',   desc: t => `会心率+${pct(t.value)}（スキルでも会心が出る）` },
 };
 
 // ---------------------------------------------------------------------
@@ -346,7 +366,8 @@ const STATUS_INFO = {
   // --- 15階以降の仲間で追加 ---
   sleep:         { icon: '💤', name: '眠り',     skipTurn: true, applyText: 'は眠ってしまった！', desc: () => '次の行動を1回休む' },
   focus:         { icon: '✨', name: '魔力集中', applyText: 'は魔力を集中している！',             desc: () => '次のスキルの効果が2倍' },
-  counterStance: { icon: '🥋', name: '構え',     applyText: 'は構えた！',                         desc: () => '次に受ける攻撃に反撃する' },
+  counterStance: { icon: '🥋', name: '構え',     applyText: 'は構えた！',                         desc: () => '次に受ける攻撃に1.5倍で反撃する' },
+  songRegen:     { icon: '🎼', name: '再生',     regen: true, applyText: 'は癒しの歌に包まれた！',      desc: s => `毎ターン最大HPの${pct(s.value)}回復` },
   // --- 51〜70階で追加 ---
   // deathOnExpire: 残りターンが0になると即死
   bound:  { icon: '🩹', name: '拘束', skipTurn: true, applyText: 'は包帯でしばられた！',     desc: () => '行動できない（攻撃されると解ける）' },
@@ -429,12 +450,15 @@ const ELITE = {
 //   加入しても出撃枠に空きが無ければ控え（強化画面で出撃メンバーを入れ替える）
 const CHARACTERS = {
   hero: {
-    name: '主人公', attackEffect: 'fx_slash', role: 'all', image: 'characters/hero.png', hp: 180, atk: 30, def: 15, spd: 100,
-    skills: ['attack', 'defend', 'heavySlash', 'legSweep', 'firstAid', 'quicken'],
+    name: '主人公', attackEffect: 'fx_slash', role: 'all', image: 'characters/hero.png', hp: 220, atk: 36, def: 20, spd: 110,
+    traits: [{ type: 'courage', rate: 1.15, max: 3 }],
+    skills: ['attack', 'defend', 'heavySlash', 'heroStrike', 'legSweep', 'firstAid', 'quicken'],
     autoRules: [
       { skill: 'quicken',    when: { firstTurn: true } },
       { skill: 'legSweep',   when: { enemyCharging: true }, target: 'charging' },
       { skill: 'firstAid',   when: { hpBelow: 0.3 } },
+      { skill: 'heroStrike', when: { enemyHpBelow: 0.5 }, target: 'lowHpEnemy' }, // HP50%以下の敵に優先して必殺
+      { skill: 'heroStrike' },
       { skill: 'heavySlash' },
     ],
   },
@@ -461,7 +485,8 @@ const CHARACTERS = {
 
   // ---- 15階以降に加入する仲間 ----
   thief: {
-    name: '盗賊', attackEffect: 'fx_slash', role: 'speed', image: 'characters/thief.png', hp: 150, atk: 26, def: 12, spd: 140,
+    name: '盗賊', attackEffect: 'fx_slash', role: 'speed', image: 'characters/thief.png', hp: 170, atk: 32, def: 14, spd: 150,
+    traits: [{ type: 'nimble', evasion: 0.15, gauge: 0.3 }],
     join: { reachFloor: 15 },
     skills: ['attack', 'defend', 'twinSlash', 'shadowStitch', 'steal'],
     autoRules: [
@@ -479,20 +504,22 @@ const CHARACTERS = {
     ],
   },
   archer: {
-    name: '弓使い', attackEffect: 'fx_arrow', role: 'finisher', image: 'characters/archer.png', hp: 140, atk: 30, def: 12, spd: 115,
+    name: '弓使い', attackEffect: 'fx_arrow', role: 'finisher', image: 'characters/archer.png', hp: 160, atk: 36, def: 14, spd: 120,
+    traits: [{ type: 'hawkEye', value: 0.2 }],
     join: { reachFloor: 25 },
     skills: ['attack', 'defend', 'aimedShot', 'pinningArrow', 'volley'],
     autoRules: [
-      { skill: 'aimedShot',    when: { enemyHpBelow: 0.3 } },
+      { skill: 'aimedShot',    when: { enemyHpBelow: 0.5 } },
       { skill: 'pinningArrow', when: { enemySpdAtLeast: 140 }, target: 'fastest' },
       { skill: 'volley' },
     ],
   },
   bard: {
-    name: '吟遊詩人', attackEffect: 'fx_impact', role: 'buffer', image: 'characters/bard.png', hp: 130, atk: 14, def: 12, spd: 120,
+    name: '吟遊詩人', attackEffect: 'fx_impact', role: 'buffer', image: 'characters/bard.png', hp: 160, atk: 18, def: 16, spd: 125,
     join: { defeatBoss: 30 },
-    skills: ['attack', 'defend', 'windSong', 'braveSong', 'lullaby'],
+    skills: ['attack', 'defend', 'windSong', 'braveSong', 'healSong', 'lullaby'],
     autoRules: [
+      { skill: 'healSong',  when: { allyHpBelow: 0.6, allyCount: 2 } },         // HP60%以下の味方が2人以上
       { skill: 'lullaby',   when: { enemyDanger: true }, target: 'danger' }, // 大技予告中の敵を眠らせる
       { skill: 'windSong',  when: { allyMissingBuff: 'song_wind' } },
       { skill: 'braveSong', when: { allyMissingBuff: 'song_brave' } },
@@ -500,9 +527,9 @@ const CHARACTERS = {
     ],
   },
   monk: {
-    name: '拳闘家', attackEffect: 'fx_impact', role: 'combo', image: 'characters/monk.png', hp: 190, atk: 28, def: 18, spd: 105,
+    name: '拳闘家', attackEffect: 'fx_impact', role: 'combo', image: 'characters/monk.png', hp: 220, atk: 34, def: 22, spd: 110,
     join: { reachFloor: 35 },
-    ki: { max: 5, atkPer: 0.08 }, // 気：攻撃するたび1たまる（最大5）。気1つにつき攻撃+8%
+    ki: { max: 5, atkPer: 0.10 }, // 気：攻撃が1ヒットするたび1たまる（最大5。連撃なら1回で3）。気1つにつき攻撃+10%
     skills: ['attack', 'defend', 'comboStrike', 'hyakuretsu', 'stance'],
     autoRules: [
       { skill: 'hyakuretsu',  when: { kiAtLeast: 5 } },
@@ -515,6 +542,7 @@ const CHARACTERS = {
     join: { defeatBoss: 40 },
     skills: ['attack', 'defend', 'timeHaste', 'timeStop', 'rewind'],
     autoRules: [
+      { skill: 'rewind',    when: { allyDead: true }, target: 'deadAlly' },    // 戦闘不能の味方がいれば最優先で復活
       { skill: 'timeStop',  when: { enemyDanger: true } },
       { skill: 'rewind',    when: { allyHpBelow: 0.3 }, target: 'weakestAlly' },
       { skill: 'timeHaste', when: { hasOtherAlly: true }, target: 'strongestAlly' },

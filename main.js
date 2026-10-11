@@ -276,6 +276,8 @@ function hasStatus(unit, id) {
 function evasionOf(unit) {
   let ev = trait(unit, 'evasion') ? trait(unit, 'evasion').value : 0;
   ev += gearBonus(unit, 'evasion'); // 風の盾
+  const nimble = trait(unit, 'nimble'); // 身軽（盗賊）
+  if (nimble) ev += nimble.evasion;
   for (const s of unit.statuses) ev += STATUS_INFO[s.id].evasion || 0;
   return Math.min(0.95, ev);
 }
@@ -384,10 +386,11 @@ function strike(b, user, target, opts = {}) {
   // 閃光のピアスは最初の攻撃に確定。堅牢な相手・鉄壁の盾を持つ相手には出ない）
   let crit = false;
   if (!opts.noCrit && !trait(target, 'critImmune') && !gearSpecial(target, 'critImmune')) {
-    const canCrit = !opts.isSkill || gearSpecial(user, 'skillCrit');
+    const hawk = trait(user, 'hawkEye'); // 鷹の目（弓使い）：会心率アップ。スキルでも会心が出る
+    const canCrit = !opts.isSkill || gearSpecial(user, 'skillCrit') || hawk;
     const sure = (trait(user, 'executeCrit') && targetLow) || (gearSpecial(user, 'firstCrit') && firstAttack)
       || (opts.sureCritBelow && target.hp / target.base.hp <= opts.sureCritBelow); // 狙い撃ち：弱った相手に必ず会心
-    if (sure || (canCrit && Math.random() < gearBonus(user, 'critRate'))) {
+    if (sure || (canCrit && Math.random() < gearBonus(user, 'critRate') + (hawk ? hawk.value : 0))) {
       crit = true;
       dmg *= ITEM_CONFIG.baseCritMultiplier + gearBonus(user, 'critDamage');
     }
@@ -427,6 +430,8 @@ function strike(b, user, target, opts = {}) {
   deferInvertedHeal(b, target, dmg); // 反転：このダメージは2ターン後に回復に変わる
   if (user.side !== target.side) {
     recordDamage(user, dmg, opts.kind || (opts.isCounter ? 'counter' : opts.isSkill ? 'skill' : 'normal'));
+    // 気（拳闘家）：攻撃が1ヒットするたびに1たまる（百烈拳そのものではたまらない）
+    if (user.kiMax && b.skillId !== 'hyakuretsu' && user.ki < user.kiMax) user.ki++;
   }
   b.log(`${opts.label || ''}${crit ? '会心の一撃！ ' : ''}${target.name}に ${dmg} のダメージ！${target.guarding ? '（防御）' : ''}`, 'damage');
   b.track(Anim.hit(target));
@@ -561,9 +566,9 @@ function strike(b, user, target, opts = {}) {
   const canCounter = !opts.isCounter && target.alive && user.alive && user.side !== target.side;
   const counter = gearSpecial(target, 'counter') || trait(target, 'counter');
   if (canCounter && hasStatus(target, 'counterStance')) {
-    // 構え：次に受けた攻撃に必ず反撃（1回で構えは解ける）
+    // 構え：次に受けた攻撃に必ず反撃（1回で構えは解ける。攻撃力×1.5）
     target.statuses = target.statuses.filter(s => s.id !== 'counterStance');
-    b.counters.push({ by: target, to: user });
+    b.counters.push({ by: target, to: user, power: 1.5, label: '構えからの反撃' });
   } else if (counter && canCounter && Math.random() < counter.chance) {
     b.counters.push({ by: target, to: user });
   }
@@ -624,6 +629,8 @@ const EFFECT_HANDLERS = {
 
   // 能力変化（rate > 1 で強化、rate < 1 で弱体）
   buff(b, user, target, eff) {
+    // 歌など（scaleByPower）：上がる量に、使う人の装備の「スキル効果+○%」を乗せる
+    if (eff.scaleByPower) eff = { ...eff, rate: 1 + (eff.rate - 1) * (1 + gearBonus(user, 'skillPower')) * b.skillMult };
     applyBuff(target, eff, target === b.current);
     b.log(`${target.name}の${STAT_LABELS[eff.stat]}が${eff.rate > 1 ? '上がった' : '下がった'}！`, 'info');
   },
@@ -659,8 +666,10 @@ const EFFECT_HANDLERS = {
   // 状態異常をかける { type: 'status', status: 'burn', value: 0.03, turns: 2, chance: 0.3 }
   status(b, user, target, eff) {
     if (eff.chance !== undefined && Math.random() >= eff.chance) return;
-    if (isInvulnerable(target) && target !== user) return;
-    applyStatus(b, target, eff.status, eff.value || 0, eff.turns);
+    if (isInvulnerable(target) && target !== user && user.side !== target.side) return;
+    // 癒しの歌の再生など（scaleByPower）：量に装備の「スキル効果+○%」を乗せる
+    const value = eff.scaleByPower ? (eff.value || 0) * (1 + gearBonus(user, 'skillPower')) * b.skillMult : (eff.value || 0);
+    applyStatus(b, target, eff.status, value, eff.turns);
     // かけた相手を覚えておく（リッチが倒れたら死の宣告が解ける）
     const s = target.statuses.find(x => x.id === eff.status);
     if (s) s.from = user.uid;
@@ -870,7 +879,26 @@ const EFFECT_HANDLERS = {
     b.log(`${target.name}の時間が加速した！ すぐに行動できる！`, 'info');
   },
 
-  // 巻き戻し：HPを turns ターン前（その味方の行動で数える）の値に戻す。今より低くはしない
+  // 巻き戻し（時の魔導士）：HP全回復＋状態異常を解除。戦闘不能なら全回復で復活
+  fullRestore(b, user, target) {
+    if (!target.alive) {
+      b.revive(target, 1, `${user.name}が時を巻き戻し、`);
+      return;
+    }
+    const before = target.hp;
+    target.hp = target.base.hp;
+    const bad = target.statuses.filter(s => BAD_STATUSES.includes(s.id));
+    target.statuses = target.statuses.filter(s => !BAD_STATUSES.includes(s.id));
+    // 氷漬けが解けたら、氷塊も消す
+    if (bad.some(s => s.id === 'entombed')) {
+      for (const o of b.units) if (o.alive && o.iceFor === target.uid) b.vanish(o, `${o.name}は時の流れに溶けて消えた。`);
+    }
+    b.log(`${target.name}の時間が巻き戻った！ HPが全回復した！${bad.length ? '（状態異常も消えた）' : ''}`, 'heal');
+    if (target.hp > before) Anim.number(target, `+${target.hp - before}`, 'heal');
+    b.track(Anim.heal(target));
+  },
+
+  // 巻き戻し（旧）：HPを turns ターン前（その味方の行動で数える）の値に戻す。今より低くはしない（時空の番人が使う）
   rewind(b, user, target, eff) {
     const h = target.hpHistory;
     const past = h.length ? h[Math.max(0, h.length - eff.turns)] : target.hp;
@@ -946,6 +974,9 @@ function applyMirrorCopy(b, unit) {
   unit.skills = usable;
   unit.ai = usable.map(id => ({ skill: id, weight: id === 'defend' ? 0.3 : 1 }));
 }
+
+// 解除される「悪い状態異常」（巻き戻しで消える）
+const BAD_STATUSES = ['poison', 'burn', 'freeze', 'charm', 'ink', 'vulnerable', 'sleep', 'bound', 'doom', 'sealed', 'entombed', 'inverted'];
 
 // 能力変化をかける（行動順プレビューの計算でも使う）
 // skip: 自分にかけた場合、今のターン終了時はカウントしない
@@ -1180,7 +1211,8 @@ class Battle {
     for (const u of this.units) u.wait = this.fullWait(u);
     // 先手のブーツ・神速の靴など：戦闘開始時に行動ゲージを進める（100%で最初に必ず行動）
     for (const u of this.units) {
-      const head = Math.min(1, gearBonus(u, 'openingGauge'));
+      const nimble = trait(u, 'nimble'); // 身軽（盗賊）：戦闘開始時に行動ゲージを進める
+      const head = Math.min(1, gearBonus(u, 'openingGauge') + (nimble ? nimble.gauge : 0));
       if (head > 0) u.wait *= 1 - head;
     }
     // 先陣の盾：戦闘開始時に味方全員の防御アップ
@@ -1637,6 +1669,8 @@ class Battle {
     let doomed = false;
     for (const s of actor.statuses) {
       const info = STATUS_INFO[s.id];
+      // 再生（癒しの歌）：毎ターン最大HPの一部を回復
+      if (info.regen && actor.alive) restoreHp(this, actor, actor.base.hp * s.value, `（${info.name}）`);
       // やけどは炎の属性（やけどで倒れたゾンビは起き上がらない）
       if (info.dot && actor.alive) {
         const from = s.from ? this.units.find(u => u.uid === s.from) : null; // 毒・やけどをかけた人（与ダメージの記録用）
@@ -1744,6 +1778,14 @@ class Battle {
     if (rule.target === 'fastest' && opp.length) {
       return [opp.reduce((a, c) => (getStat(c, 'spd') > getStat(a, 'spd') ? c : a))];
     }
+    if (rule.target === 'deadAlly') {         // 戦闘不能の味方（巻き戻しで復活させる）
+      const dead = this.deadFriendsOf(user);
+      if (dead.length) return [dead[0]];
+    }
+    if (rule.target === 'lowHpEnemy') {       // HP50%以下の敵のうち、HPの割合が一番低い敵
+      const low = opp.filter(o => o.hp / o.base.hp <= 0.5 && !isInvulnerable(o));
+      if (low.length) return [low.reduce((a, c) => (c.hp / c.base.hp < a.hp / a.base.hp ? c : a))];
+    }
     if (rule.target === 'weakestAlly' && fri.length) {
       return [fri.reduce((a, c) => (c.hp / c.base.hp < a.hp / a.base.hp ? c : a))];
     }
@@ -1771,7 +1813,13 @@ class Battle {
   }
 
   // スキルが対象選択を必要とするか（候補が2体以上いるとき）
+  // 味方の中から選べる相手（anyAlly は戦闘不能の味方も含む）
+  allyChoices(user, skill) {
+    return skill.target === 'anyAlly' ? [...this.friendsOf(user), ...this.deadFriendsOf(user)] : this.friendsOf(user);
+  }
+
   needsTargetChoice(user, skill) {
+    if (skill.target === 'anyAlly') return this.allyChoices(user, skill).length > 1;
     if (skill.target === 'enemy') return this.opponentsOf(user).length > 1;
     if (skill.target === 'ally')  return this.friendsOf(user).length > 1;
     return false;
@@ -1792,6 +1840,10 @@ class Battle {
       case 'lowestRatioEnemy': return opp.length ? [byRatio(opp)] : []; // 死の鎌：HPの割合が一番低い相手
       case 'self':       return [user];
       case 'ally':       return [byRatio(fri)];
+      case 'anyAlly': {  // 戦闘不能の味方も選べる（自動なら戦闘不能を優先、いなければHPの割合が一番低い味方）
+        const dead = this.deadFriendsOf(user);
+        return dead.length ? [dead[0]] : [byRatio(fri)];
+      }
       case 'allAllies':  return fri;
       case 'deadAlly': {  // 倒れた仲間（蘇生）
         const dead = this.deadFriendsOf(user);
@@ -1853,7 +1905,7 @@ class Battle {
         : targets;
       for (const t of effTargets) {
         // 倒れた相手には効果なし（蘇生と、とどめを刺した相手から盗むのは別）
-        if (!t.alive && eff.type !== 'revive' && eff.type !== 'steal') continue;
+        if (!t.alive && eff.type !== 'revive' && eff.type !== 'steal' && eff.type !== 'fullRestore') continue;
         handler(this, user, t, eff);
       }
     }
@@ -2042,6 +2094,14 @@ class Battle {
         o.statuses = o.statuses.filter(s => !(s.id === 'doom' && s.from === unit.uid));
         this.log(`${o.name}の死の宣告が解けた！`, 'system');
       }
+    }
+    // 勇気（主人公）：味方が倒れるたびに攻撃アップ（最大 max 回）
+    for (const f of this.friendsOf(unit)) {
+      const cg = trait(f, 'courage');
+      if (!cg || (f.courageCount || 0) >= cg.max) continue;
+      f.courageCount = (f.courageCount || 0) + 1;
+      stackBuff(f, 'atk', cg.rate, 'courage', Math.pow(cg.rate, cg.max));
+      this.log(`${f.name}の勇気が燃え上がる！ 攻撃が上がった！（${f.courageCount}/${cg.max}）`, 'info');
     }
     // 仲間の仇（ヘルハウンド）：仲間が倒れるたびに攻撃アップ
     for (const f of this.friendsOf(unit)) {
@@ -2332,8 +2392,7 @@ class Battle {
       if (dOn) stackBuff(user, 'def', dOn.rate, 'knightSword', Math.pow(dOn.rate, dOn.max));
       const hOn = gearSpecial(user, 'healOnAttack');                 // 祝福の剣
       if (hOn) restoreHp(this, user, user.base.hp * hOn.ratio, '（祝福の剣）');
-      // 気（拳闘家）：攻撃するたびに1たまる（百烈拳で使い切ったときは増えない）
-      if (user.kiMax && usedSkillId !== 'hyakuretsu' && user.ki < user.kiMax) user.ki++;
+
     }
 
     // バフの残りターンを減らし、切れたものを消す
@@ -2581,7 +2640,7 @@ const UI = {
     // 技の対象を選んでいる最中なら、タップしたキャラ（部位も）をそのまま狙う
     card.addEventListener('click', () => {
       const tg = this.targeting;
-      if (tg && battle === tg.b && tg.b.waitingInput && tg.list.includes(u) && u.alive) {
+      if (tg && battle === tg.b && tg.b.waitingInput && tg.list.includes(u) && (u.alive || SKILLS[tg.skillId].target === 'anyAlly')) {
         this.execute(tg.b, tg.actor, tg.skillId, [u]);
         return;
       }
@@ -2800,8 +2859,8 @@ const UI = {
         } else {
           this.execute(b, actor, id, b.autoTargets(actor, skill));
         }
-      }, !b.canUse(actor, id), `${skillDescText(skill)}（${skillLimitText(skill)}）`,
-      () => b.previewEntries(actor, id, previewTargets(), n), skillTipHtml(skill));
+      }, !b.canUse(actor, id), `${skillDescText(skill, 1 + gearBonus(actor, 'skillPower'))}（${skillLimitText(skill, gearMax(actor, 'cooldownCut'))}）`,
+      () => b.previewEntries(actor, id, previewTargets(), n), skillTipHtml(skill, actor));
     }
     if (battle === b) OrderList.render(b);
   },
@@ -2809,13 +2868,13 @@ const UI = {
   // 対象の選択
   showTargets(b, actor, skillId) {
     const skill = SKILLS[skillId];
-    const list = skill.target === 'enemy' ? b.opponentsOf(actor) : b.friendsOf(actor);
+    const list = skill.target === 'enemy' ? b.opponentsOf(actor) : b.allyChoices(actor, skill);
     this.clearCommands();
     this.el.cmdTitle.textContent = `${skill.name}：対象を選んでください（キャラをタップしても選べます）`;
     this.targeting = { b, actor, skillId, list };
     for (const u of list) if (u.dom) u.dom.card.classList.add('targetable');
     for (const t of list) {
-      this.addButton(`${t.name}（HP ${t.hp}）`, () => this.execute(b, actor, skillId, [t]), false, '',
+      this.addButton(t.alive ? `${t.name}（HP ${t.hp}）` : `${t.name}（戦闘不能）`, () => this.execute(b, actor, skillId, [t]), false, '',
         () => b.previewEntries(actor, skillId, [t], BATTLE_CONFIG.orderPreview));
     }
     this.addButton('もどる', () => this.showCommands(b, actor));
@@ -2843,12 +2902,15 @@ const UI = {
   renderHeader() {
     const lv = gameState.globalLevel;
     const endless = isEndless(gameState.floor);
+    // 全滅したときに戻る階（下の階をやり直しているときは選んだ階）
+    const respawn = gameState.selectedFloor && gameState.floor < gameState.maxFloor ? gameState.selectedFloor : gameState.checkpoint;
+    const replay = gameState.repeatFloor ? '🔁くり返し中　' : (gameState.selectedFloor && gameState.floor < gameState.maxFloor ? '🗺やり直し中　' : '');
     // アップデート前の最高到達階のほうが深ければ、記録として並べて表示
     const old = gameState.oldMaxFloor > gameState.maxFloor ? `（以前の記録 ${gameState.oldMaxFloor}階）` : '';
     this.el.floor.textContent =
-      endless
-        ? `${areaOf(gameState.floor).name}　無限 ${gameState.floor}階 ／ 無限モード最高 ${gameState.endlessBest || gameState.floor}階（全滅時は ${gameState.checkpoint}階へ）`
-        : `${areaOf(gameState.floor).name}　現在 ${gameState.floor}階 ／ 最高 ${gameState.maxFloor}階${old}（全滅時は ${gameState.checkpoint}階へ）`;
+      replay + (endless
+        ? `${areaOf(gameState.floor).name}　無限 ${gameState.floor}階 ／ 無限モード最高 ${gameState.endlessBest || gameState.floor}階（全滅時は ${respawn}階へ）`
+        : `${areaOf(gameState.floor).name}　現在 ${gameState.floor}階 ／ 最高 ${gameState.maxFloor}階${old}（全滅時は ${respawn}階へ）`);
     const titles = (gameState.titles || []).map(t => `🏅${t}`).join(' ');
     // 無限モードを解放した人は、無限モードの最高到達階も出す（無限モード中は上の行に出るので省く）
     const endlessRec = gameState.endlessBest && !endless ? `　♾無限モード：最高${gameState.endlessBest}階` : '';
@@ -2977,8 +3039,11 @@ const UI = {
 };
 
 // スキルの説明（吹き出し用）：名前・使用制限・効果
-function skillTipHtml(skill) {
-  return `<b>${skill.name}</b><span class="tip-limit">${skillLimitText(skill)}</span><br>${skillDescText(skill)}`;
+// actor：使うキャラ（装備のスキル効果・使用制限ターン短縮を反映した数値で出す）
+function skillTipHtml(skill, actor = null) {
+  const power = actor ? 1 + gearBonus(actor, 'skillPower') : 1;
+  const cut = actor ? gearMax(actor, 'cooldownCut') : 0;
+  return `<b>${skill.name}</b><span class="tip-limit">${skillLimitText(skill, cut)}</span><br>${skillDescText(skill, power)}`;
 }
 
 // ---------------------------------------------------------------------
@@ -3299,7 +3364,11 @@ function onBattleEnd(b, win) {
     }
 
     const wasBoss = isBossFloor(b.floor);
-    if (isEndless(b.floor) && b.floor % ENDLESS.rewardEvery === 0) {
+    // 初めてのクリアか（階層を選んで下の階をやり直しているときは、初回撃破の報酬は出ない）
+    const firstClear = isFirstClear(b.floor);
+    if (!firstClear) {
+      if (wasBoss) b.log('すでに倒したボスなので、初回撃破の報酬はありません。', 'info');
+    } else if (isEndless(b.floor) && b.floor % ENDLESS.rewardEvery === 0) {
       // 無限モード：10階ごとにポイントと、上級アイテム（特級装備の素材）の選択
       gameState.points += ENDLESS.points;
       grantBossReward(ENDLESS.bossChoices);
@@ -3316,7 +3385,7 @@ function onBattleEnd(b, win) {
     // 第○部の最後のボス撃破（初めて）→「第○部クリア」の演出だけ出して、そのまま先へ
     const part = DUNGEON.partClears[b.floor] && !gameState.partsShown.includes(b.floor);
     advanceFloor();
-    if (wasBoss) detail += `<br>チェックポイント更新：全滅しても ${gameState.checkpoint}階から再開`;
+    if (wasBoss && firstClear) detail += `<br>チェックポイント更新：全滅しても ${gameState.checkpoint}階から再開`;
     if (part) {
       gameState.partsShown.push(b.floor);
       saveGame();
@@ -3342,7 +3411,7 @@ function onBattleEnd(b, win) {
       later(() => { if (battle === b) showEnding(); }, DUNGEON.floorInterval);
       return; // エンディングで選ぶまで次の階へは進まない
     }
-    UI.showResult(true, `${b.floor}階クリア！`, `${detail}${topDmg}<br>${gameState.floor}階へ進みます…`);
+    UI.showResult(true, `${b.floor}階クリア！`, `${detail}${topDmg}<br>${gameState.repeatFloor ? `🔁 もう一度 ${gameState.floor}階を戦います…` : `${gameState.floor}階へ進みます…`}`);
   } else {
     // 神々の塔：全滅した回数を記録（次からその階のボスのHPが下がる救済措置）
     if (isTowerFloor(b.floor)) gameState.towerWipes[b.floor] = (gameState.towerWipes[b.floor] || 0) + 1;
@@ -3350,10 +3419,10 @@ function onBattleEnd(b, win) {
     returnToCheckpoint();
     allyHp = {}; // 全員満タンでやり直し
     if (b.gaveUp) {
-      UI.showResult(false, '撤退…', `${gameState.checkpoint}階からやり直します…`);
+      UI.showResult(false, '撤退…', `${gameState.floor}階からやり直します…`);
     } else {
       b.log('全滅してしまった…', 'system');
-      UI.showResult(false, '全滅…', `${gameState.checkpoint}階からやり直します…`);
+      UI.showResult(false, '全滅…', `${gameState.floor}階からやり直します…`);
     }
   }
   UI.renderHeader();
@@ -3390,6 +3459,7 @@ const HOWTO_HTML = `
       <li><b>ダンジョンを1階ずつ進もう。</b>敵を全滅させると次の階へ。10階ごとにボスがいて、全滅すると最後に倒したボスの階に戻ります。</li>
       <li><b>速いキャラほどたくさん行動。</b>キャラの下の「⏱ ○番目」と「行動順」タブで、これからの順番と敵の大技の予告「⚠」が見られます。<b>キャラをタップ</b>すると攻撃・防御・速さやバフの詳細が開きます。</li>
       <li><b>味方の番に技を選ぼう。</b>技のボタンを<b>長押し</b>（PCはマウスを乗せる）すると説明が出ます。「オート」をONにすると味方も自動で戦います。×2・×4で戦闘が速くなります。勝てないときは「🏳 諦める」でチェックポイントに戻れます。</li>
+      <li><b>🗺 階層を選ぶ</b>：最高到達階の10階下までなら、好きな階からやり直せます。「この階をくり返す」をONにすると、同じ階で経験値やアイテムを稼げます。</li>
       <li><b>「強化」タブ</b>：レベルアップでもらえるポイントで、ステータスや出撃枠を増やせます。戦闘中でも操作できます。</li>
       <li><b>「アイテム」タブ</b>：5階ごとにアイテムを1つ選べます。下級アイテム2つを合成すると上級アイテムに。いらないアイテムは<b>🎒ボタン</b>で経験値に変換できます。</li>
       <li><b>閉じている間も成長。</b>次に開いたとき、離れていた時間に応じて経験値がもらえます（最大8時間）。進行は自動で保存されます。</li>
@@ -3468,6 +3538,58 @@ document.addEventListener('click', e => {
 });
 
 document.getElementById('help-btn').addEventListener('click', () => UI.popup(HOWTO_HTML));
+
+// ---------------------------------------------------------------------
+// 🗺 階層を選ぶ（最高到達階−10 〜 最高到達階。「この階をくり返す」で稼ぎもできる）
+// ---------------------------------------------------------------------
+function openFloorSelect() {
+  const floors = selectableFloors();
+  let pick = Math.min(Math.max(gameState.floor, floors[0]), floors[floors.length - 1]);
+  const render = () => {
+    const cells = floors.map(f => {
+      const boss = isBossFloor(f);
+      const cleared = f < gameState.maxFloor;
+      return `<button type="button" class="fs-cell${f === pick ? ' active' : ''}${boss ? ' boss' : ''}" data-floor="${f}">
+        <b>${f}階</b><small>${areaOf(f).name}${boss ? '・ボス' : ''}${cleared ? '' : '・最前線'}</small></button>`;
+    }).join('');
+    const bossNote = isBossFloor(pick) && pick < gameState.maxFloor
+      ? '<p class="modal-note">すでに倒したボスの階です。ボスは再登場しますが、初回撃破の報酬（上級アイテム確定・特級合成の解放・仲間の加入など）は出ません。通常の経験値と報酬は出ます。</p>' : '';
+    Modal.setBody(`
+      <p class="modal-note">選んだ階から戦闘を始めます。クリアすると1つ上の階へ進みます。<br>
+      下の階で全滅したときは、選んだ階からやり直します（チェックポイントは変わりません）。</p>
+      <div class="fs-grid">${cells}</div>
+      <label class="setting-row"><input type="checkbox" id="fs-repeat" ${gameState.repeatFloor ? 'checked' : ''}>
+        <span><b>この階をくり返す</b><br><small>ON：クリアしても同じ階を何度も戦う（経験値・アイテム稼ぎ用）</small></span></label>
+      ${bossNote}
+      <div class="modal-buttons"><button id="fs-go" class="primary" type="button">${pick}階から始める</button></div>`);
+    const body = document.getElementById('modal-body');
+    for (const c of body.querySelectorAll('.fs-cell')) {
+      c.addEventListener('click', () => { pick = Number(c.dataset.floor); render(); });
+    }
+    // くり返しの ON/OFF はすぐ反映（今の階のままでも使える）
+    document.getElementById('fs-repeat').addEventListener('change', e => {
+      gameState.repeatFloor = e.target.checked;
+      if (gameState.repeatFloor && !gameState.selectedFloor) gameState.selectedFloor = gameState.floor;
+      if (!gameState.repeatFloor && gameState.floor >= gameState.maxFloor) gameState.selectedFloor = null;
+      saveGame();
+      UI.renderHeader();
+    });
+    document.getElementById('fs-go').addEventListener('click', () => {
+      const repeat = document.getElementById('fs-repeat').checked;
+      if (!selectFloor(pick, repeat)) return;
+      Modal.close();
+      allyHp = {};       // 全員満タンで始める
+      battle = null;     // 今の戦闘は終わり（経験値・報酬はなし）
+      UI.renderHeader();
+      startFloor();
+      Cloud.save('floor');
+      showToast(`${pick}階から始めます${repeat ? '（くり返し）' : ''}`);
+    });
+  };
+  Modal.open('🗺 階層を選ぶ', '');
+  render();
+}
+document.getElementById('floor-btn').addEventListener('click', openFloorSelect);
 
 // ---------------------------------------------------------------------
 // 起動

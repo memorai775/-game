@@ -55,6 +55,8 @@ function newGameState() {
     cycleCompensated: false, // 2周目へ進んでいた人への補償を受け取ったか
     endlessUnlocked: false, // 無限モードが解放されたか（100階クリアで解放）
     endlessBest: 0,     // 無限モードの最高到達階
+    selectedFloor: null, // 「階層を選ぶ」で選んだ階（下の階を戦っている間。全滅したらここからやり直す）
+    repeatFloor: false,  // 「この階をくり返す」：クリアしても同じ階を戦う（稼ぎ用）
     noticeVersion: 0,   // アップデートのお知らせをどの版まで見たか
     bestiary: {},       // 倒した敵の記録 { 敵ID: { kills: 倒した数, firstFloor: 初めて倒した階 } }（📖図鑑）
     endingShown: false, // 真のエンディングを見たか

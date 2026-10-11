@@ -1818,3 +1818,10 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 #log-root:not(.hidden) { display: flex; flex-direction: column; }
 #log-root #dmg-meter { flex: 0 0 auto; max-height: 45%; overflow-y: auto; }
 #stage #log-root #log { flex: 1 1 auto; min-height: 0; height: auto; }
+
+/* ---- 🗺 階層を選ぶ ---- */
+.fs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin: 8px 0; }
+.fs-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; }
+.fs-cell small { font-size: 0.68rem; color: #9aa3c0; }
+.fs-cell.boss { border-color: #a05050; }
+.fs-cell.active { border-color: #ffd54a; background: rgba(255, 213, 74, 0.15); color: #ffd54a; }

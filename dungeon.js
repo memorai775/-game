@@ -176,25 +176,55 @@ function createFloorEnemies(floor) {
   });
 }
 
+// まだクリアしていない一番上の階か（ここをクリアすると「初回撃破」。下の階のやり直しは初回ではない）
+function isFirstClear(floor) {
+  return floor >= gameState.maxFloor;
+}
+
 // 階をクリアしたとき：次の階へ進む（ボス階ならチェックポイント更新）
+// 「この階をくり返す」が ON なら、同じ階にとどまる
 function advanceFloor() {
   const f = gameState.floor;
-  // 神々の塔は1階ごとにチェックポイント（全滅しても次の階＝今いた階からやり直し）
-  if (isTowerFloor(f)) gameState.checkpoint = f + 1;
-  else if (isBossFloor(f)) gameState.checkpoint = f + DUNGEON.checkpointOffset;
-  gameState.floor = f + 1;
-  gameState.maxFloor = Math.max(gameState.maxFloor, gameState.floor);
+  // チェックポイント（下がることはない）。神々の塔は1階ごと（全滅しても今いた階からやり直し）
+  if (isTowerFloor(f)) gameState.checkpoint = Math.max(gameState.checkpoint, f + 1);
+  else if (isBossFloor(f)) gameState.checkpoint = Math.max(gameState.checkpoint, f + DUNGEON.checkpointOffset);
+  const next = f + 1;
+  gameState.floor = gameState.repeatFloor ? f : next;
+  gameState.maxFloor = Math.max(gameState.maxFloor, next);
   gameState.bestFloor = Math.max(gameState.bestFloor || 1, gameState.maxFloor); // 減らない記録（ランキング用）
   // 100階（終焉の神）を倒したら無限モードが解放される。無限モードの最高到達階も記録
   if (f === DUNGEON.finalFloor) gameState.endlessUnlocked = true;
-  if (isEndless(gameState.floor)) gameState.endlessBest = Math.max(gameState.endlessBest || 0, gameState.floor);
+  if (isEndless(next)) gameState.endlessBest = Math.max(gameState.endlessBest || 0, Math.min(next, gameState.maxFloor));
+  // 一番上（まだクリアしていない階）まで戻ってきたら、「選んだ階」の状態は終わり
+  if (!gameState.repeatFloor && gameState.floor >= gameState.maxFloor) gameState.selectedFloor = null;
   saveGame();
   Cloud.save('floor'); // 階層クリア時にクラウドへ保存（最高記録ならランキングも更新）
 }
 
 // 全滅したとき：チェックポイントへ戻る
+// 階層を選んで下の階を戦っているときは、選んだ階からやり直す（チェックポイントは変えない）
 function returnToCheckpoint() {
-  gameState.floor = gameState.checkpoint;
+  const sel = gameState.selectedFloor;
+  gameState.floor = (sel && gameState.floor < gameState.maxFloor) ? sel : gameState.checkpoint;
   saveGame();
   Cloud.save('wipe');
+}
+
+// 階層を選ぶ：選べる範囲（最高到達階−10 〜 最高到達階。1階より下にはならない）
+function selectableFloors() {
+  const top = Math.max(1, gameState.maxFloor);
+  const from = Math.max(1, top - 10);
+  const list = [];
+  for (let f = from; f <= top; f++) list.push(f);
+  return list;
+}
+
+// 選んだ階から始める（repeat：この階をくり返す）
+function selectFloor(floor, repeat) {
+  if (!selectableFloors().includes(floor)) return false;
+  gameState.floor = floor;
+  gameState.selectedFloor = floor < gameState.maxFloor || repeat ? floor : null;
+  gameState.repeatFloor = !!repeat;
+  saveGame();
+  return true;
 }
