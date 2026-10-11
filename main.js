@@ -372,6 +372,12 @@ function strike(b, user, target, opts = {}) {
   // 生命の剣：HP満タンなら攻撃アップ
   const fullHp = gearSpecial(user, 'fullHpAtk');
   if (fullHp && user.hp >= user.base.hp) power *= fullHp.rate;
+  // 疾風の刃（盗賊）：速さに応じてダメージアップ
+  const gale = galeEdgeBonus(user);
+  if (gale > 0) power *= 1 + gale;
+  // 急所狙い（盗賊）：弱っている相手へのダメージアップ
+  const ws = trait(user, 'weakSpot');
+  if (ws && isWeakened(target)) power *= 1 + ws.bonus;
   // 先駆けの剣：戦闘で最初の攻撃が強くなる（反撃は数えない）
   const firstAttack = !user.attackedOnce && !opts.isCounter;
   const first = gearSpecial(user, 'firstStrike');
@@ -387,10 +393,10 @@ function strike(b, user, target, opts = {}) {
   let crit = false;
   if (!opts.noCrit && !trait(target, 'critImmune') && !gearSpecial(target, 'critImmune')) {
     const hawk = trait(user, 'hawkEye'); // 鷹の目（弓使い）：会心率アップ。スキルでも会心が出る
-    const canCrit = !opts.isSkill || gearSpecial(user, 'skillCrit') || hawk;
+    const canCrit = !opts.isSkill || gearSpecial(user, 'skillCrit') || hawk || opts.critBonus;
     const sure = (trait(user, 'executeCrit') && targetLow) || (gearSpecial(user, 'firstCrit') && firstAttack)
       || (opts.sureCritBelow && target.hp / target.base.hp <= opts.sureCritBelow); // 狙い撃ち：弱った相手に必ず会心
-    if (sure || (canCrit && Math.random() < gearBonus(user, 'critRate') + (hawk ? hawk.value : 0))) {
+    if (sure || (canCrit && Math.random() < gearBonus(user, 'critRate') + (hawk ? hawk.value : 0) + (opts.critBonus || 0))) {
       crit = true;
       dmg *= ITEM_CONFIG.baseCritMultiplier + gearBonus(user, 'critDamage');
     }
@@ -471,6 +477,7 @@ function strike(b, user, target, opts = {}) {
     const push = trait(user, 'delayOnHit');
     if (push && target.alive) {
       target.wait += b.fullWait(target) * push.amount;
+      markGaugeDown(target);
       b.log(`${push.label || '麻痺'}！ ${target.name}の行動が遅れた！`, 'info');
     }
     // 速度低下（紫電の魔剣）：より強い速度低下がすでにかかっていれば上書きしない
@@ -489,6 +496,7 @@ function strike(b, user, target, opts = {}) {
     const freeze = trait(user, 'freezeOnHit');
     if (freeze && target.alive && Math.random() < freeze.chance) {
       target.wait = b.fullWait(target);
+      markGaugeDown(target);
       applyStatus(b, target, 'freeze', 0, 1);
     }
     // 防御ダウン（茨の剣）
@@ -587,8 +595,12 @@ const EFFECT_HANDLERS = {
   // ダメージ
   damage(b, user, target, eff) {
     const skill = SKILLS[b.skillId];
+    // 影討ち：行動ゲージを下げていた敵には、別の（大きい）倍率
+    const basePower = eff.vsGaugeDown && target.gaugeDown ? eff.vsGaugeDown : (eff.power ?? 1);
+    if (eff.vsGaugeDown && target.gaugeDown) b.log(`影から急所を突いた！`, 'info');
     const opts = {
-      power: (eff.power ?? 1) * (eff.isCounter ? 1 : b.skillMult), // 魔力集中なら2倍
+      power: basePower * (eff.isCounter ? 1 : b.skillMult), // 魔力集中なら2倍
+      critBonus: eff.critBonus || 0,    // 二刀斬り：1回ごとの会心率アップ
       isSkill: b.skillId !== 'attack', // 通常攻撃以外は「スキル」
       aoe: skill && (skill.target === 'allEnemies' || skill.target === 'allAllies'),
       isCounter: !!eff.isCounter,
@@ -638,6 +650,7 @@ const EFFECT_HANDLERS = {
   // 行動を遅らせる（待ち時間を増やす）
   delay(b, user, target, eff) {
     target.wait += b.fullWait(target) * eff.amount;
+    markGaugeDown(target);
     b.log(`${target.name}の行動が遅れた！`, 'info');
   },
 
@@ -721,6 +734,7 @@ const EFFECT_HANDLERS = {
   freeze(b, user, target, eff) {
     if (eff.chance !== undefined && Math.random() >= eff.chance) return;
     target.wait = b.fullWait(target);
+    markGaugeDown(target);
     applyStatus(b, target, 'freeze', 0, 1);
   },
 
@@ -924,6 +938,7 @@ const EFFECT_HANDLERS = {
     const others = b.living(b.units).filter(u => u !== target);
     const last = Math.max(0, ...others.map(u => u.wait));
     target.wait = Math.max(target.wait, last + 1);
+    markGaugeDown(target);
     b.log(`${target.name}は吹き飛ばされ、行動が一番後ろになった！`, 'info');
   },
 
@@ -975,6 +990,25 @@ function applyMirrorCopy(b, unit) {
   unit.ai = usable.map(id => ({ skill: id, weight: id === 'defend' ? 0.3 : 1 }));
 }
 
+// 疾風の刃（盗賊）：速さに応じたダメージ補正（0〜max）。装備やバフの速さも入る
+function galeEdgeBonus(unit) {
+  const t = trait(unit, 'galeEdge');
+  if (!t) return 0;
+  return Math.max(0, Math.min(t.max, (getStat(unit, 'spd') - 100) * t.per));
+}
+
+// 弱っている相手か（悪い状態異常・弱体効果がかかっている、または行動ゲージを下げられて次に動くまで）
+function isWeakened(unit) {
+  return unit.gaugeDown
+    || unit.statuses.some(s => BAD_STATUSES.includes(s.id))
+    || unit.buffs.some(x => x.rate < 1);
+}
+
+// 行動ゲージを下げた印（その相手が次に行動するまで。急所狙い・影討ちで使う）
+function markGaugeDown(unit) {
+  if (unit.alive) unit.gaugeDown = true;
+}
+
 // 解除される「悪い状態異常」（巻き戻しで消える）
 const BAD_STATUSES = ['poison', 'burn', 'freeze', 'charm', 'ink', 'vulnerable', 'sleep', 'bound', 'doom', 'sealed', 'entombed', 'inverted'];
 
@@ -1016,6 +1050,8 @@ function checkCondition(b, unit, when) {
   if (when.notBossBattle && isBossFloor(b.floor)) return false;
   if (when.everyNth && unit.actCount % when.everyNth !== when.everyNth - 1) return false;
   if (when.hasParts && !b.partsOf(unit).length) return false;
+  if (when.enemyGaugeDown && !b.opponentsOf(unit).some(o => o.gaugeDown && !isInvulnerable(o))) return false;
+  if (when.skillReadySoon && (unit.cooldowns[when.skillReadySoon] || 0) > 1) return false;
   if (when.noSummonAlive && b.units.some(u => u.alive && u.summonedBy === unit.uid)) return false;
   if (when.noOpponentStatus && b.opponentsOf(unit).some(o => hasStatus(o, when.noOpponentStatus))) return false;
   // ---- 15階以降の仲間のオート用 ----
@@ -1486,6 +1522,7 @@ class Battle {
     this.current = actor;
     this.turnCount++;
     actor.guarding = false; // 防御は自分の次の行動開始時に解除
+    actor.gaugeDown = false; // 行動ゲージを下げられた印も、自分が動いたら消える
     for (const u of this.units) {
       if (u.coveredBy === actor) u.coveredBy = null; // かばうも自分の次の行動開始時に解除
     }
@@ -1781,6 +1818,18 @@ class Battle {
     if (rule.target === 'deadAlly') {         // 戦闘不能の味方（巻き戻しで復活させる）
       const dead = this.deadFriendsOf(user);
       if (dead.length) return [dead[0]];
+    }
+    const hittable = opp.filter(o => !isInvulnerable(o) && !o.autoAvoid);
+    if (rule.target === 'gaugeDownEnemy') {   // 行動ゲージを下げた敵（HPが多い順）
+      const gd = hittable.filter(o => o.gaugeDown);
+      if (gd.length) return [gd.reduce((a, c) => (c.hp > a.hp ? c : a))];
+    }
+    if (rule.target === 'toughestEnemy' && hittable.length) { // HPが一番多い敵（大技を当てたい相手）
+      return [hittable.reduce((a, c) => (c.hp > a.hp ? c : a))];
+    }
+    if (rule.target === 'weakenedEnemy') {    // 弱っている敵を優先（いなければふつうの優先順）
+      const wk = hittable.filter(isWeakened);
+      if (wk.length) return [lowestHp(wk)];
     }
     if (rule.target === 'lowHpEnemy') {       // HP50%以下の敵のうち、HPの割合が一番低い敵
       const low = opp.filter(o => o.hp / o.base.hp <= 0.5 && !isInvulnerable(o));

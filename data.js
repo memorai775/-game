@@ -128,9 +128,10 @@ const SKILLS = {
 
   // --- 15階以降に加入する仲間 ---
   // oncePerBattle: 1戦闘1回（ボタンに「使用済み」と出る） / needsKi: 気がないと使えない
-  twinSlash:    { name: '二刀斬り', effect: 'fx_slash',     target: 'enemy', desc: '敵1体に0.9倍×2回', effects: [{ type: 'damage', power: 0.9, hits: 2 }] },
-  shadowStitch: { name: '影縫い', effect: 'fx_dark',       target: 'enemy', cooldown: 2, desc: '敵1体の行動ゲージ-50%', effects: [{ type: 'delay', amount: 0.5 }] },
-  steal:        { name: '盗む', effect: 'fx_slash',         target: 'enemy', oncePerBattle: true, desc: '攻撃＋30%で盗む（成功するとこの階のクリア時にアイテムを1回多く選べる）。1戦闘1回', effects: [{ type: 'damage', power: 1.0 }, { type: 'steal', chance: 0.3 }] },
+  twinSlash:    { name: '二刀斬り', effect: 'fx_slash',     target: 'enemy', desc: '敵1体に1.0倍×2回。1回ごとに会心率+15%', effects: [{ type: 'damage', power: 1.0, hits: 2, critBonus: 0.15 }] },
+  shadowStitch: { name: '影縫い', effect: 'fx_dark',       target: 'enemy', cooldown: 2, desc: '敵1体に0.8倍ダメージ＋行動ゲージ-50%', effects: [{ type: 'damage', power: 0.8 }, { type: 'delay', amount: 0.5 }] },
+  shadowStrike: { name: '影討ち', effect: 'fx_dark',       target: 'enemy', cooldown: 3, desc: '敵1体に2.2倍ダメージ。行動ゲージを下げていた敵には3.5倍', effects: [{ type: 'damage', power: 2.2, vsGaugeDown: 3.5 }] },
+  steal:        { name: '盗む', effect: 'fx_slash',         target: 'enemy', oncePerBattle: true, desc: '敵1体に1.0倍ダメージ＋30%で盗む（成功するとこの階のクリア時にアイテムを1回多く選べる）。1戦闘1回', effects: [{ type: 'damage', power: 1.0 }, { type: 'steal', chance: 0.3 }] },
   fireball:     { name: '火球', effect: 'fx_fire',         target: 'enemy', magic: true, desc: '敵1体に1.4倍ダメージ', effects: [{ type: 'damage', power: 1.4 }] },
   inferno:      { name: '爆炎', effect: 'fx_explosion',         target: 'allEnemies', cooldown: 2, magic: true, shake: true, desc: '敵全体に0.8倍ダメージ＋やけど（2ターン）', effects: [{ type: 'damage', power: 0.8 }, { type: 'status', status: 'burn', value: 0.03, turns: 2 }] },
   focus:        { name: '魔力集中', effect: 'fx_buff',     target: 'self', cooldown: 3, desc: '次のスキルの効果2倍＋行動ゲージ+30%', effects: [{ type: 'status', status: 'focus', turns: 99 }, { type: 'gaugeAfter', amount: 0.3 }] },
@@ -341,6 +342,8 @@ const TRAIT_INFO = {
   courage:        { icon: '🔥', name: '勇気',     desc: t => `味方が倒れるたびに攻撃+${pct(t.rate - 1)}（戦闘中のみ、最大${t.max}回）` },
   nimble:         { icon: '🍃', name: '身軽',     desc: t => `回避率${pct(t.evasion)}、戦闘開始時に行動ゲージ+${pct(t.gauge)}` },
   hawkEye:        { icon: '🦅', name: '鷹の目',   desc: t => `会心率+${pct(t.value)}（スキルでも会心が出る）` },
+  galeEdge:       { icon: '🌪', name: '疾風の刃', desc: t => `与えるダメージが速さに応じて上がる：+(速さ−100)×${pct(t.per)}（上限+${pct(t.max)}。装備やバフの速さも入る）` },
+  weakSpot:       { icon: '🎯', name: '急所狙い', desc: t => `状態異常・弱体効果がかかった敵、行動ゲージを下げた敵（次に動くまで）へのダメージ+${pct(t.bonus)}` },
 };
 
 // ---------------------------------------------------------------------
@@ -486,12 +489,14 @@ const CHARACTERS = {
   // ---- 15階以降に加入する仲間 ----
   thief: {
     name: '盗賊', attackEffect: 'fx_slash', role: 'speed', image: 'characters/thief.png', hp: 170, atk: 32, def: 14, spd: 150,
-    traits: [{ type: 'nimble', evasion: 0.15, gauge: 0.3 }],
+    traits: [{ type: 'nimble', evasion: 0.15, gauge: 0.3 }, { type: 'galeEdge', per: 0.005, max: 1.0 }, { type: 'weakSpot', bonus: 0.4 }],
     join: { reachFloor: 15 },
-    skills: ['attack', 'defend', 'twinSlash', 'shadowStitch', 'steal'],
+    skills: ['attack', 'defend', 'twinSlash', 'shadowStitch', 'shadowStrike', 'steal'],
     autoRules: [
-      { skill: 'shadowStitch', when: { nextEnemyDanger: true }, target: 'nextEnemy' }, // 次に動く敵が大技予告中なら止める
-      { skill: 'twinSlash' },
+      { skill: 'shadowStrike', when: { enemyGaugeDown: true }, target: 'gaugeDownEnemy' },  // 行動ゲージを下げた敵に影討ち（3.5倍）
+      { skill: 'shadowStitch', when: { enemyDanger: true }, target: 'danger' },             // 大技予告中の敵を止める
+      { skill: 'shadowStitch', when: { skillReadySoon: 'shadowStrike' }, target: 'toughestEnemy' }, // 影討ちの準備：HPが多い敵の行動ゲージを下げる
+      { skill: 'twinSlash', target: 'weakenedEnemy' },                                       // 弱体効果がかかった敵を優先
     ],
   },
   mage: {
