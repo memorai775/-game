@@ -3011,7 +3011,7 @@ const UI = {
         ${t.image ? `<img class="popup-portrait" src="${t.image}" alt="${t.name}">` : ''}
         <p class="popup-title">${t.name}が仲間になった！</p>
         <p class="popup-note">${note}</p>
-        <div class="popup-skills"><div class="popup-skills-title">スキル</div>${skillListHtml(id)}</div>`);
+        <div class="popup-skills">${passiveListHtml(id) ? `<div class="popup-skills-title">パッシブ</div>${passiveListHtml(id)}` : ''}<div class="popup-skills-title">スキル</div>${skillListHtml(id)}</div>`);
       if (battle) battle.log(`${t.name}が仲間になった！`, 'system');
     }
     if (joined.length) Panel.refresh();

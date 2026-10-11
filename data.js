@@ -342,7 +342,7 @@ const TRAIT_INFO = {
   courage:        { icon: '🔥', name: '勇気',     desc: t => `味方が倒れるたびに攻撃+${pct(t.rate - 1)}（戦闘中のみ、最大${t.max}回）` },
   nimble:         { icon: '🍃', name: '身軽',     desc: t => `回避率${pct(t.evasion)}、戦闘開始時に行動ゲージ+${pct(t.gauge)}` },
   hawkEye:        { icon: '🦅', name: '鷹の目',   desc: t => `会心率+${pct(t.value)}（スキルでも会心が出る）` },
-  galeEdge:       { icon: '🌪', name: '疾風の刃', desc: t => `与えるダメージが速さに応じて上がる：+(速さ−100)×${pct(t.per)}（上限+${pct(t.max)}。装備やバフの速さも入る）` },
+  galeEdge:       { icon: '🌪', name: '疾風の刃', desc: t => `与えるダメージが速さに応じて上がる：+(速さ−100)×${Math.round(t.per * 1000) / 10}%（上限+${pct(t.max)}。装備やバフの速さも入る）` },
   weakSpot:       { icon: '🎯', name: '急所狙い', desc: t => `状態異常・弱体効果がかかった敵、行動ゲージを下げた敵（次に動くまで）へのダメージ+${pct(t.bonus)}` },
 };
 

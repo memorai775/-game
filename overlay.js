@@ -150,7 +150,9 @@ const UnitDetail = {
         ${intent ? `<div class="detail-intent">${escapeHtml(intent)}</div>` : ''}
         <div class="detail-sec">バフ・デバフ・状態</div>
         <ul class="detail-list">${effects.join('') || '<li class="none">なし</li>'}</ul>
-        ${traits.length ? `<div class="detail-sec">特殊能力</div><ul class="detail-list">${traits.join('')}</ul>` : ''}
+        ${u.side === 'ally'
+          ? (u.charId && charPassives(u.charId).length ? `<div class="detail-sec">パッシブ</div><ul class="detail-list">${charPassives(u.charId).map(p => `<li>${p.icon} <b>${p.name}</b>：${p.desc}</li>`).join('')}</ul>` : '')
+          : (traits.length ? `<div class="detail-sec">特殊能力</div><ul class="detail-list">${traits.join('')}</ul>` : '')}
         ${u.side === 'ally' ? `<div class="detail-sec">この戦闘で与えたダメージ</div>${UI.damageTable([{ name: u.name, d: u.dmgDealt || { total: 0 } }])}` : ''}
         ${u.side === 'ally' ? `<div class="detail-sec">装備</div><ul class="detail-list">${
           gear.length ? gear.map(id => `<li>${itemIcon(id, 'sm')} ${ITEMS[id].name}：${ITEMS[id].desc}</li>`).join('') : '<li class="none">なし</li>'}</ul>` : ''}

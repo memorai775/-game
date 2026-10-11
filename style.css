@@ -1825,3 +1825,8 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 .fs-cell small { font-size: 0.68rem; color: #9aa3c0; }
 .fs-cell.boss { border-color: #a05050; }
 .fs-cell.active { border-color: #ffd54a; background: rgba(255, 213, 74, 0.15); color: #ffd54a; }
+
+/* パッシブ（強化タブ・仲間加入・キャラ詳細） */
+.skill-sub { margin: 6px 0 2px; font-size: 0.72rem; font-weight: bold; color: #c0c6dc; }
+.passive-list li { background: rgba(167, 123, 255, 0.1); }
+.skill-limit.passive-tag { color: #d9c4ff; background: rgba(167, 123, 255, 0.2); }

@@ -145,6 +145,28 @@ function skillListHtml(charId) {
   }).join('')}</ul>`;
 }
 
+// キャラのパッシブ（いつも効いている能力）の一覧 [{ icon, name, desc }]
+// data.js の traits（TRAIT_INFO）に加えて、気（拳闘家）と通常攻撃の属性も出す
+function charPassives(charId) {
+  const t = CHARACTERS[charId];
+  const list = (t.traits || []).filter(tr => TRAIT_INFO[tr.type]).map(tr => {
+    const info = TRAIT_INFO[tr.type];
+    return { icon: info.icon, name: tr.label || info.name, desc: info.desc(tr) };
+  });
+  if (t.ki) list.push({ icon: '💪', name: '気', desc: `攻撃が1ヒットするたびに気が1たまる（最大${t.ki.max}）。気1つにつき攻撃+${Math.round(t.ki.atkPer * 100)}%。奥義・百烈拳で使う` });
+  if (t.attackElement === 'fire') list.push({ icon: '🔥', name: '炎の攻撃', desc: '通常攻撃は炎の属性（倒したゾンビは起き上がらない）' });
+  if (t.attackElement === 'light') list.push({ icon: '✨', name: '光の攻撃', desc: '通常攻撃は光の属性（倒したゾンビは起き上がらない）' });
+  return list;
+}
+
+// パッシブの一覧のHTML（無ければ ''）
+function passiveListHtml(charId) {
+  const list = charPassives(charId);
+  if (!list.length) return '';
+  return `<ul class="skill-list passive-list">${list.map(p =>
+    `<li><span class="skill-name">${p.icon} ${p.name}</span><span class="skill-limit passive-tag">パッシブ</span><small>${p.desc}</small></li>`).join('')}</ul>`;
+}
+
 // 作り直した画面（next）を今の画面（cur）に重ねて、変わったところだけ書き換える
 // 形（要素の種類や数）が同じ部分はそのまま残すので、画像の読み直しやスクロールのずれが起きない
 // 形が違う部分だけ丸ごと入れ替える
@@ -303,7 +325,9 @@ const UpgradeUI = {
     // スキル一覧（名前・効果・使用制限）
     const sk = document.createElement('details');
     sk.className = 'skill-box';
-    sk.innerHTML = `<summary>スキル（${t.skills.length}）</summary>${skillListHtml(id)}`;
+    const passives = charPassives(id);
+    sk.innerHTML = `<summary>スキル（${t.skills.length}）${passives.length ? `・パッシブ（${passives.length}）` : ''}</summary>` +
+      `${passives.length ? `<div class="skill-sub">パッシブ（いつも効いている能力）</div>${passiveListHtml(id)}<div class="skill-sub">スキル</div>` : ''}${skillListHtml(id)}`;
     if (this.openSkills.has(id)) sk.open = true;
     sk.addEventListener('toggle', () => {
       if (sk.open) this.openSkills.add(id); else this.openSkills.delete(id);
