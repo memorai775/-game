@@ -316,7 +316,7 @@ const UpgradeUI = {
     const equips = equippedItems(id);
     const eq = document.createElement('div');
     eq.className = 'equip-summary';
-    eq.innerHTML = `<div class="equip-title">装備（${equips.length}/${ITEM_CONFIG.slotsPerChar}）</div>` +
+    eq.innerHTML = `<div class="equip-title">装備（${equips.length}/${equipSlots()}）</div>` +
       (equips.length
         ? equips.map(i => `<div class="icon-row">${itemIcon(i, 'sm')}<span>${itemLabel(i)}：${ITEMS[i].desc}</span></div>`).join('')
         : '<div class="panel-note">なし（「アイテム」タブで装備）</div>');
@@ -412,7 +412,7 @@ const ItemUI = {
       box.innerHTML = `<div class="equip-char">${CHARACTERS[charId].name}${gameState.sortie.includes(charId) ? '' : '（控え）'}` +
         `<span class="legend-cap${lc >= LEGEND.perChar ? ' full' : ''}">特級 ${lc}/${LEGEND.perChar}</span></div>`;
       const equips = equippedItems(charId);
-      for (let slot = 0; slot < ITEM_CONFIG.slotsPerChar; slot++) {
+      for (let slot = 0; slot < equipSlots(); slot++) {
         const row = document.createElement('div');
         row.className = 'equip-slot';
         const itemId = equips[slot];

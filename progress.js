@@ -285,6 +285,8 @@ function applySaveDataRaw(saved) {
   }
   if (!Array.isArray(gameState.partsShown)) gameState.partsShown = [];
   if (!gameState.legendBest || typeof gameState.legendBest !== 'object') gameState.legendBest = {};
+  // 装備枠のお知らせ：項目の無い古いデータで、すでに4枠の人には出さない
+  if (saved && saved.extraSlotNotified === undefined && equipSlots() > ITEM_CONFIG.baseSlots) gameState.extraSlotNotified = true;
   // 特級合成の解放：項目が無い古いデータは、50階のボスを倒している（または特級を持っている）なら解放済みにする
   if (saved && saved.legendUnlocked === undefined) {
     const owns = Object.keys(gameState.legendBest).length > 0
@@ -304,9 +306,9 @@ function applySaveDataRaw(saved) {
       return false;
     });
   }
-  // 装備枠：多すぎる分は所持品に戻す（枠を減らしたときのため）
+  // 装備枠：多すぎる分は所持品に戻す（枠を減らしたとき・51階より手前で4つ付けていたときのため）
   for (const id in gameState.equips) {
-    const extra = gameState.equips[id].splice(ITEM_CONFIG.slotsPerChar);
+    const extra = gameState.equips[id].splice(equipSlots());
     gameState.inventory.push(...extra);
   }
   if (!gameState.towerWipes || typeof gameState.towerWipes !== 'object') gameState.towerWipes = {};
@@ -524,6 +526,12 @@ function equippedItems(charId) {
   return gameState.equips[charId] || [];
 }
 
+// 今の装備枠の数（51階に着くまでは3つ、着いたら4つ。一度着けば、下の階に戻っても4つのまま）
+function equipSlots() {
+  const reached = Math.max(gameState.maxFloor || 1, gameState.bestFloor || 1);
+  return reached >= ITEM_CONFIG.extraSlotFloor ? ITEM_CONFIG.slotsPerChar : ITEM_CONFIG.baseSlots;
+}
+
 // 装備している特級装備の数
 function legendCount(charId) {
   return equippedItems(charId).filter(id => ITEMS[id] && ITEMS[id].tier === 3).length;
@@ -534,7 +542,7 @@ function equipItem(charId, itemId) {
   const list = gameState.equips[charId] = equippedItems(charId);
   const idx = gameState.inventory.indexOf(itemId);
   if (idx === -1) return 'missing';
-  if (list.length >= ITEM_CONFIG.slotsPerChar) return 'full';
+  if (list.length >= equipSlots()) return 'full';
   if (ITEMS[itemId].tier === 3 && legendCount(charId) >= LEGEND.perChar) return 'legendLimit';
   gameState.inventory.splice(idx, 1);
   list.push(itemId);

@@ -3451,6 +3451,16 @@ function onBattleEnd(b, win) {
         <p class="popup-note">「アイテム」タブの合成欄にある「特級合成」から作れます。<br>特級装備は1人${LEGEND.perChar}個まで装備できます。</p>`);
     }
     UI.announceRecruits(checkRecruits()); // 到達階・ボス撃破で加入条件を満たしたか
+    // 装備枠が4つになった（51階に初めて着いたとき）
+    if (equipSlots() > ITEM_CONFIG.baseSlots && !gameState.extraSlotNotified) {
+      gameState.extraSlotNotified = true;
+      saveGame();
+      b.log(`装備枠が${equipSlots()}つになった！`, 'system');
+      UI.popup(`
+        <p class="popup-title">🎒 装備枠が${equipSlots()}つになりました！</p>
+        <p>${ITEM_CONFIG.extraSlotFloor}階に到達したので、みんなの装備枠が1つ増えました。</p>
+        <p class="popup-note">「アイテム」タブの装備から、4つ目の装備を付けられます。</p>`);
+    }
     if (ending) {
       gameState.endingShown = true;
       saveGame();
@@ -3565,7 +3575,7 @@ function showUpdateNotice() {
         <li>51〜90階：冥府の墓地・魔界の城・凍てつく氷河・星の神殿</li>
         <li>91〜100階：ボスだけが待つ「神々の塔」と、真のエンディング</li>
         <li>100階クリア後は<b>無限モード</b>（2周目はなくなりました）</li>
-        <li>上級装備3つから作る<b>特級装備</b>（★1〜★5）と、4つ目の装備枠</li>
+        <li>上級装備3つから作る<b>特級装備</b>（★1〜★5）と、51階で増える4つ目の装備枠</li>
         <li>スキルの説明（長押し）・「諦める」ボタン・アイテムのアイコン表示</li>
       </ul>`);
   }

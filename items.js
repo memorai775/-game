@@ -7,7 +7,9 @@
 // アイテム全体の設定
 // ---------------------------------------------------------------------
 const ITEM_CONFIG = {
-  slotsPerChar: 4,       // 1人が装備できる数
+  slotsPerChar: 4,       // 1人が装備できる数の最大（extraSlotFloor 階に着くまでは baseSlots 個）
+  baseSlots: 3,          // 最初の装備枠の数
+  extraSlotFloor: 51,    // この階に着くと、装備枠が slotsPerChar 個に増える
   rewardEvery: 5,        // 何階ごとのクリアで報酬がもらえるか
   rewardChoices: 5,      // 報酬で並ぶアイテムの数（この中から1個選ぶ）
   highTierFrom: 20,      // この階以降のクリア報酬には上級アイテムが混ざることがある
