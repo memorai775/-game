@@ -1830,3 +1830,20 @@ button.primary { border-color: #ffd54a; color: #ffd54a; }
 .skill-sub { margin: 6px 0 2px; font-size: 0.72rem; font-weight: bold; color: #c0c6dc; }
 .passive-list li { background: rgba(167, 123, 255, 0.1); }
 .skill-limit.passive-tag { color: #d9c4ff; background: rgba(167, 123, 255, 0.2); }
+
+/* ---- 行動ゲージ（HPバーの下の細い青いバー。満タンで行動） ---- */
+.gaugebar { height: 3px; margin: 1px 0 0; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.gaugebar > div { height: 100%; width: 0; background: linear-gradient(90deg, #4a8cff, #7ac8ff); transition: width calc(0.3s / var(--speed, 1)) ease-out; }
+.gaugebar.full > div { background: #ffd54a; }
+.gaugebar.delayed { box-shadow: 0 0 0 1px #e05a4a; }
+#stage.portrait:not([data-tab="order"]) .gaugebar { height: 2px; }
+.detail-gauge { height: 5px; margin-top: 3px; }
+#stage .gaugebar { height: 4px; margin-top: 2px; }
+#stage.portrait:not([data-tab="order"]) .gaugebar { height: 2px; margin-top: 1px; }
+
+/* 行動ゲージのマイナス表示：赤いバー＋横に「-30%」 */
+.gaugerow { display: flex; align-items: center; gap: 3px; }
+.gaugerow .gaugebar { flex: 1 1 auto; min-width: 0; }
+.gauge-neg { flex: none; font-size: 9px; line-height: 1; font-weight: bold; color: #ff7a6a; font-variant-numeric: tabular-nums; }
+.gauge-neg:empty { display: none; }
+.gaugebar.delayed > div { background: linear-gradient(90deg, #e05a4a, #ff9a6a); }

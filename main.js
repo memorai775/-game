@@ -990,6 +990,22 @@ function applyMirrorCopy(b, unit) {
   unit.ai = usable.map(id => ({ skill: id, weight: id === 'defend' ? 0.3 : 1 }));
 }
 
+// 行動ゲージ（0〜1。1で行動）。待ち時間が満タン1回分より長い（大きく遅らされた）ときは 0
+function gaugeRatio(b, unit) {
+  return Math.max(0, gaugeValue(b, unit));
+}
+
+// 行動ゲージの本当の値（1で行動。大きく遅らされると 0 より下＝マイナスになる。例：-0.3 ＝ -30%）
+function gaugeValue(b, unit) {
+  if (!unit.alive || !b) return 0;
+  return Math.min(1, 1 - unit.wait / b.fullWait(unit));
+}
+
+// 行動ゲージの表示用の文字（例：「45%」「-30%」）
+function gaugeText(b, unit) {
+  return `${Math.round(gaugeValue(b, unit) * 100)}%`;
+}
+
 // 疾風の刃（盗賊）：速さに応じたダメージ補正（0〜max）。装備やバフの速さも入る
 function galeEdgeBonus(unit) {
   const t = trait(unit, 'galeEdge');
@@ -2681,6 +2697,7 @@ const UI = {
       <div class="name">${u.name}<span class="traits">${traits}</span></div>
       <div class="sub">${sub}</div>
       <div class="hpbar"><div></div></div>
+      <div class="gaugerow"><div class="gaugebar" title="行動ゲージ（満タンで行動）"><div></div></div><span class="gauge-neg"></span></div>
       <div class="turn-badge"></div>
       <div class="hp-text"></div>
       <div class="stats"></div>
@@ -2714,6 +2731,9 @@ const UI = {
       badges: card.querySelector('.badges'),
       popups: card.querySelector('.popups'),
       hpFill: card.querySelector('.hpbar > div'),
+      gauge:  card.querySelector('.gaugebar'),
+      gaugeFill: card.querySelector('.gaugebar > div'),
+      gaugeNeg: card.querySelector('.gauge-neg'),
       hpText: card.querySelector('.hp-text'),
       turn:   card.querySelector('.turn-badge'),
       stats:  card.querySelector('.stats'),
@@ -2774,6 +2794,15 @@ const UI = {
 
     d.hpFill.style.width = `${ratio * 100}%`;
     d.hpFill.className = ratio < 0.25 ? 'low' : ratio < 0.5 ? 'mid' : '';
+    // 行動ゲージ：満タンで行動。大きく遅らされている（待ち時間が満タン1回分より長い）ときは赤い枠
+    // マイナス（大きく遅らされた）のときは、赤いバーでマイナスの量を出し、横に「-30%」のように数字も出す
+    const gv = gaugeValue(b, u);
+    const neg = u.alive && gv < -0.005;
+    d.gaugeFill.style.width = `${(neg ? Math.min(1, -gv) : Math.max(0, gv)) * 100}%`;
+    d.gauge.classList.toggle('delayed', neg);
+    d.gauge.classList.toggle('full', u.alive && gv >= 1 - EPS);
+    d.gaugeNeg.textContent = neg ? gaugeText(b, u) : '';
+    d.gauge.title = u.alive ? `行動ゲージ ${gaugeText(b, u)}${neg ? '（遅らされている：0%に戻るまでも時間がかかる）' : ''}` : '';
     d.hpText.textContent = `HP ${u.hp} / ${u.base.hp}`;
 
     // 行動順（常に表示）：今行動中／何番目に行動するか
