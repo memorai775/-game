@@ -994,6 +994,22 @@ button, select, input, .trait-icon, .sbadge, .item-icon, .kiwami { touch-action:
 .modal-error { font-size: 12px; color: #ff9a8a; min-height: 1em; }
 .modal-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
 button.primary { border-color: #ffd54a; color: #ffd54a; }
+/* ---- シェア ---- */
+.share-preview {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #1d2232;
+  border: 1px solid #4a5270;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: normal;
+  word-break: break-all;
+}
+.share-buttons button { padding: 8px 14px; }
+button.share-x { background: #000; border-color: #fff; color: #fff; font-weight: bold; }
+.popup-share { margin-top: 4px; border-color: #ffd54a; color: #ffd54a; }
+.rank-share { margin-left: 8px; padding: 2px 8px; font-size: 11px; border-color: #ffd54a; color: #ffd54a; }
+#ending-share { border-color: #ffd54a; color: #ffd54a; }
 #nickname-input {
   width: 100%;
   padding: 8px 10px;

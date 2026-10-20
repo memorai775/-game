@@ -3371,7 +3371,8 @@ function showPartClear(floor) {
   UI.popup(`
     <p class="popup-title">🎉 ${pc.title}</p>
     <p>${pc.text}</p>
-    <p class="popup-note">${pc.note}<br>${DUNGEON.finalFloor}階に待つ「終焉の神」を倒すと、真のエンディングです。</p>`);
+    <p class="popup-note">${pc.note}<br>${DUNGEON.finalFloor}階に待つ「終焉の神」を倒すと、真のエンディングです。</p>
+    <p><button type="button" class="popup-share" data-share="part" data-share-title="${escapeHtml(pc.title)}">📣 達成をシェア</button></p>`);
 }
 // エンディングを閉じて、無限モード（101階）へ
 function closeEnding() {

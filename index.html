@@ -24,8 +24,8 @@
   <meta property="og:title" content="ゆーるぴーじー｜ブラウザで遊べる放置ターン制RPG">
   <meta property="og:description" content="速さで行動順が決まるターン制バトル。仲間9人、全100階のダンジョン、装備75種を合成して強くなる放置RPG。無料・登録なしでスマホでもすぐ遊べます。">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://memorai.github.io/-game/">
-  <meta property="og:image" content="https://memorai.github.io/-game/ogp.png">
+  <meta property="og:url" content="https://memorai775.github.io/-game/">
+  <meta property="og:image" content="https://memorai775.github.io/-game/ogp.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:site_name" content="ゆーるぴーじー">
@@ -33,9 +33,9 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="ゆーるぴーじー｜ブラウザで遊べる放置ターン制RPG">
   <meta name="twitter:description" content="速さで行動順が決まるターン制バトル。仲間9人、全100階のダンジョン、装備75種を合成して強くなる放置RPG。無料・登録なしでスマホでもすぐ遊べます。">
-  <meta name="twitter:image" content="https://memorai.github.io/-game/ogp.png">
+  <meta name="twitter:image" content="https://memorai775.github.io/-game/ogp.png">
 
-  <link rel="stylesheet" href="style.css?v=202610140300">
+  <link rel="stylesheet" href="style.css?v=202610200300">
 </head>
 <body>
   <!-- ゲーム画面（960×540 の16:9。screen.js が画面サイズに合わせて拡大縮小する） -->
@@ -56,6 +56,7 @@
         <span id="cloud-status"></span>
         <button id="floor-btn" type="button" title="階層を選ぶ">🗺<span class="lbl"> 階層</span></button>
         <button id="zukan-btn" type="button" title="図鑑">📖<span class="lbl"> 図鑑</span></button>
+        <button id="share-btn" type="button" title="記録をシェア">📣</button>
         <button id="ranking-btn" type="button" title="ランキング">🏆<span class="lbl"> ランキング</span></button>
         <button id="account-btn" type="button" title="アカウント">☁<span class="lbl"> アカウント</span></button>
         <button id="settings-btn" type="button" title="設定">⚙</button>
@@ -140,7 +141,7 @@
         <div id="ending-credits" class="ending-credits"></div>
         <div id="ending-stats" class="ending-stats"></div>
         <div class="ending-buttons">
-
+          <button id="ending-share" type="button" data-share="ending">📣 クリアをシェア</button>
           <button id="ending-endless">このまま101階へ（無限モード）</button>
         </div>
         <p class="ending-note">レベル・ポイント・強化・仲間・アイテムはそのまま、101階からの無限モードに挑めます。</p>
@@ -184,17 +185,18 @@
 
   <!-- ?v= の数字は版番号。ファイルを更新したら数字を変えると、ブラウザが古いファイルを使わずに読み込み直す -->
   <!-- 読み込み順：画面 → データ → 成長要素・ダンジョン → パネル → クラウド → 詳細・🎒・設定 → バトル・起動 -->
-  <script src="screen.js?v=202610140300"></script>
-  <script src="data.js?v=202610140300"></script>
-  <script src="items.js?v=202610140300"></script>
-  <script src="progress.js?v=202610140300"></script>
-  <script src="dungeon.js?v=202610140300"></script>
-  <script src="panel.js?v=202610140300"></script>
-  <script src="firebase-config.js?v=202610140300"></script>
-  <script src="cloud.js?v=202610140300"></script>
-  <script src="overlay.js?v=202610140300"></script>
-  <script src="zukan.js?v=202610140300"></script>
-  <script src="effects.js?v=202610140300"></script>
-  <script src="main.js?v=202610140300"></script>
+  <script src="screen.js?v=202610200300"></script>
+  <script src="data.js?v=202610200300"></script>
+  <script src="items.js?v=202610200300"></script>
+  <script src="progress.js?v=202610200300"></script>
+  <script src="dungeon.js?v=202610200300"></script>
+  <script src="panel.js?v=202610200300"></script>
+  <script src="firebase-config.js?v=202610200300"></script>
+  <script src="cloud.js?v=202610200300"></script>
+  <script src="share.js?v=202610200300"></script>
+  <script src="overlay.js?v=202610200300"></script>
+  <script src="zukan.js?v=202610200300"></script>
+  <script src="effects.js?v=202610200300"></script>
+  <script src="main.js?v=202610200300"></script>
 </body>
 </html>

@@ -376,7 +376,8 @@ const Cloud = {
           <td class="rank">${i + 1}</td><td class="rname">${escapeHtml(r.name)}${r.title ? ` <span class="title-badge">🏅${escapeHtml(r.title)}</span>` : ''}${mine ? '（あなた）' : ''}</td><td class="rfloor">${r.bestFloor}階</td></tr>`;
       }).join('');
       const mine = me
-        ? `<div class="my-rank">あなたの順位：<strong>${myRank}位</strong>（${me.bestFloor}階・${escapeHtml(me.name)}${me.title ? ` 🏅${escapeHtml(me.title)}` : ''}）</div>`
+        ? `<div class="my-rank">あなたの順位：<strong>${myRank}位</strong>（${me.bestFloor}階・${escapeHtml(me.name)}${me.title ? ` 🏅${escapeHtml(me.title)}` : ''}）
+            <button type="button" class="rank-share" data-share="" data-share-rank="${myRank}">📣 順位をシェア</button></div>`
         : `<div class="my-rank">まだランキングに登録されていません。<button id="rank-name-btn">ニックネームを決めて登録</button></div>`;
       Modal.setBody(`${mine}
         <div class="rank-scroll"><table class="rank-table">
